@@ -24,6 +24,7 @@ class FilterProfile(BaseModel):
     name: str
     sites: list[str]
     filter_expression: str
+    alert_channel_id: int
     price_min: float | None = None
     price_max: float | None = None
     only_available: bool = True

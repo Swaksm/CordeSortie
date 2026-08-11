@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from ..config import FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..sites import SUPPORTED_SITES
+from .alert_channels import create_alert_channel, delete_alert_channel
 
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
@@ -47,7 +48,7 @@ class FilterCog(commands.Cog):
         price_max: float | None = None,
         only_available: bool = True,
     ) -> None:
-        if interaction.guild_id is None:
+        if interaction.guild_id is None or interaction.guild is None:
             await interaction.response.send_message(
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
@@ -66,11 +67,14 @@ class FilterCog(commands.Cog):
 
         site_list = [s.strip().lower() for s in sites.split(",") if s.strip()]
 
+        # Valide les champs avant de créer quoi que ce soit sur Discord — évite de
+        # créer un salon pour un profil qui sera de toute façon rejeté.
         try:
-            profile = FilterProfile(
+            FilterProfile(
                 name=name,
                 sites=site_list,
                 filter_expression=expression,
+                alert_channel_id=0,
                 price_min=price_min,
                 price_max=price_max,
                 only_available=only_available,
@@ -81,18 +85,49 @@ class FilterCog(commands.Cog):
             )
             return
 
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            channel = await create_alert_channel(
+                interaction.guild, creator_name=interaction.user.name, profile_name=name
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "Je n'ai pas la permission de créer un salon (il me faut "
+                "**Gérer les salons**). Profil non créé.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException as exc:
+            await interaction.followup.send(
+                f"Échec de création du salon d'alerte : {exc}. Profil non créé.",
+                ephemeral=True,
+            )
+            return
+
+        profile = FilterProfile(
+            name=name,
+            sites=site_list,
+            filter_expression=expression,
+            alert_channel_id=channel.id,
+            price_min=price_min,
+            price_max=price_max,
+            only_available=only_available,
+        )
         config.profiles.append(profile)
         store.save(interaction.guild_id, config)
 
-        await interaction.response.send_message(
-            f"Profil **{name}** créé sur {', '.join(site_list)}.", ephemeral=True
+        await interaction.followup.send(
+            f"Profil **{name}** créé sur {', '.join(site_list)}. "
+            f"Alertes dans {channel.mention}.",
+            ephemeral=True,
         )
 
     @filtre_group.command(name="remove", description="Supprimer un profil de filtre")
     @app_commands.describe(name="Nom du profil à supprimer")
     @app_commands.default_permissions(manage_guild=True)
     async def remove(self, interaction: discord.Interaction, name: str) -> None:
-        if interaction.guild_id is None:
+        if interaction.guild_id is None or interaction.guild is None:
             await interaction.response.send_message(
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
@@ -111,8 +146,18 @@ class FilterCog(commands.Cog):
         config.profiles.remove(profile)
         store.save(interaction.guild_id, config)
 
+        note = ""
+        try:
+            deleted = await delete_alert_channel(interaction.guild, profile.alert_channel_id)
+            if not deleted:
+                note = " (le salon d'alerte était déjà supprimé)"
+        except discord.Forbidden:
+            note = " (permission manquante pour supprimer le salon, à faire manuellement)"
+        except discord.HTTPException:
+            note = " (erreur lors de la suppression du salon)"
+
         await interaction.response.send_message(
-            f"Profil **{name}** supprimé.", ephemeral=True
+            f"Profil **{name}** supprimé.{note}", ephemeral=True
         )
 
     @filtre_group.command(name="list", description="Lister les profils de filtre")
@@ -144,7 +189,8 @@ class FilterCog(commands.Cog):
             dispo = "disponible uniquement" if profile.only_available else "avec rupture"
             lines.append(
                 f"- **{profile.name}** — sites: {', '.join(profile.sites)} — "
-                f"`{profile.filter_expression}`{bounds_str} — {dispo}"
+                f"`{profile.filter_expression}`{bounds_str} — {dispo} — "
+                f"<#{profile.alert_channel_id}>"
             )
 
         await interaction.response.send_message("\n".join(lines), ephemeral=True)

@@ -31,6 +31,8 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [x] Support `prix_min` / `prix_max` / `only_available`
 - [x] Commandes `/filtre add`, `/filtre list`, `/filtre remove`, `/filtre test <texte>`
       (mode dry-run pour valider un filtre sur un item fictif)
+- [x] Salon d'alerte dédié auto-créé par profil (`<pseudo>-<nom du filtre>`, regroupés
+      dans une catégorie "CordeSortie"), supprimé automatiquement avec le profil
 
 ## Phase 4 — Scraper engine
 
@@ -50,7 +52,8 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 6 — Alertes & log
 
-- [ ] Notifier : embed Discord pour chaque item matché, envoyé dans le salon alerte
+- [ ] Notifier : embed Discord pour chaque item matché, envoyé dans le salon d'alerte
+      dédié du profil (`profile.alert_channel_id`)
 - [ ] Anti-doublon (ne pas re-notifier un item inchangé)
 - [ ] Notification si prix change ou item redevient disponible
 - [ ] Log périodique (salon log), intervalle configurable indépendamment du scrape
@@ -68,7 +71,7 @@ c'est la référence pour savoir où on en est, pas la conversation.
 ## Phase 8 — Déploiement Render
 
 - [x] `Dockerfile` (build + import testés en local avec Docker)
-- [ ] Repo GitHub créé et code poussé (nécessaire pour connecter Render)
+- [x] Repo GitHub créé et code poussé (nécessaire pour connecter Render)
 - [ ] Service Render "Background Worker" créé, connecté au repo
 - [ ] `DISCORD_TOKEN` configuré en variable d'environnement Render (jamais commité)
 - [ ] Render Disk monté sur `/data` (doit matcher `DATA_DIR=/data` du Dockerfile)
@@ -81,3 +84,5 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [ ] Intervalle de scrape par site (plutôt que global)
 - [ ] Interface web de configuration
 - [ ] Historique/statistiques consultables via commande (`/stats`)
+- [ ] Salon d'alerte par profil en privé (visible uniquement par le créateur du
+      filtre + les admins) au lieu de visible par tout le serveur
