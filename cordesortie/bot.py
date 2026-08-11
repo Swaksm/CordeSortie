@@ -32,10 +32,12 @@ class CordeSortieBot(commands.Bot):
         from .commands.config_commands import ConfigCog
         from .commands.control_commands import ControlCog
         from .commands.filter_commands import FilterCog
+        from .commands.site_commands import SiteCog
 
         await self.add_cog(ConfigCog(self))
         await self.add_cog(FilterCog(self))
         await self.add_cog(ControlCog(self))
+        await self.add_cog(SiteCog())
 
     async def close(self) -> None:
         await self.scheduler.stop_all()
@@ -47,6 +49,8 @@ class CordeSortieBot(commands.Bot):
         user = self.user
         logger.info("Connecté en tant que %s (id=%s)", user, user.id if user else "?")
 
+        from .commands.help_channel import update_help_channel
+
         # Copie les commandes globales vers chaque serveur puis sync sur ce
         # serveur précis : les commandes apparaissent immédiatement, au lieu
         # d'attendre jusqu'à une heure pour une sync globale côté Discord.
@@ -57,6 +61,12 @@ class CordeSortieBot(commands.Bot):
                 logger.info("Commandes synchronisées sur %s : %d", guild.name, len(synced))
             except discord.HTTPException:
                 logger.exception("Échec de synchronisation des commandes sur %s", guild.name)
+
+            try:
+                config = self.config_store.load(guild.id)
+                await update_help_channel(guild, config, self.config_store, guild.id, self)
+            except discord.HTTPException:
+                logger.exception("Échec de mise à jour du salon d'aide sur %s", guild.name)
 
         # Idempotent : rappeler on_ready après une reconnexion ne duplique pas
         # les tâches déjà en cours (voir SchedulerManager.refresh_guild).

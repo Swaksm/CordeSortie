@@ -1,9 +1,10 @@
 """Création/suppression des salons d'alerte dédiés à chaque profil de filtre.
 
 Un salon par profil, nommé <pseudo>-<nom du filtre>, regroupé dans une catégorie
-"CordeSortie" — évite que les alertes de plusieurs filtres se mélangent dans un
-seul salon (voir discussion produit). Visible par tout le serveur pour l'instant ;
-une version privée (créateur du filtre + admins uniquement) est notée en backlog.
+"Alertes" dédiée — séparée de la catégorie "CordeSortie" (salons info/aide du bot)
+pour ne pas mélanger les alertes avec les salons de pilotage. Visible par tout le
+serveur pour l'instant ; une version privée (créateur du filtre + admins
+uniquement) est notée en backlog.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import re
 import discord
 
 CATEGORY_NAME = "CordeSortie"
+ALERT_CATEGORY_NAME = "Alertes"
 
 
 def slugify(value: str) -> str:
@@ -22,17 +24,19 @@ def slugify(value: str) -> str:
     return value[:90] or "filtre"
 
 
-async def get_or_create_category(guild: discord.Guild) -> discord.CategoryChannel:
-    existing = discord.utils.get(guild.categories, name=CATEGORY_NAME)
+async def get_or_create_category(
+    guild: discord.Guild, name: str = CATEGORY_NAME
+) -> discord.CategoryChannel:
+    existing = discord.utils.get(guild.categories, name=name)
     if existing is not None:
         return existing
-    return await guild.create_category(CATEGORY_NAME)
+    return await guild.create_category(name)
 
 
 async def create_alert_channel(
     guild: discord.Guild, *, creator_name: str, profile_name: str
 ) -> discord.TextChannel:
-    category = await get_or_create_category(guild)
+    category = await get_or_create_category(guild, ALERT_CATEGORY_NAME)
     channel_name = slugify(f"{creator_name}-{profile_name}")
     return await guild.create_text_channel(
         channel_name,

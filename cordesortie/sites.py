@@ -14,3 +14,8 @@ SUPPORTED_SITES: tuple[str, ...] = (
     "fnac",
     "joueclub",
 )
+
+# Notes affichées par /sites pour les cas particuliers (voir docs/SITES.md).
+SITE_NOTES: dict[str, str] = {
+    "fnac": "bloqué par un CAPTCHA Datadome, pas d'adapter prévu",
+}

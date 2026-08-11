@@ -32,7 +32,14 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [x] Commandes `/filtre add`, `/filtre list`, `/filtre remove`, `/filtre test <texte>`
       (mode dry-run pour valider un filtre sur un item fictif)
 - [x] Salon d'alerte dédié auto-créé par profil (`<pseudo>-<nom du filtre>`, regroupés
-      dans une catégorie "CordeSortie"), supprimé automatiquement avec le profil
+      dans une catégorie "Alertes" — séparée de "CordeSortie" qui ne contient que les
+      salons de pilotage du bot), supprimé automatiquement avec le profil
+- [x] Salon "cordesortie-aide" (hors plan initial) : documentation des commandes
+      générée depuis les commandes réellement enregistrées (`bot.tree.walk_commands`),
+      pas un texte maintenu à la main — régénérée à chaque connexion, découpée en
+      plusieurs messages épinglés si ça dépasse la limite Discord (jamais tronquée)
+- [x] Commande `/sites` (hors plan initial) : liste les sites supportés et leur statut
+      réel (dérivé de `REGISTRY`, pas d'une doc à maintenir à part)
 
 ## Phase 4 — Scraper engine
 

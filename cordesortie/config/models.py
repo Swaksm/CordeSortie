@@ -75,6 +75,8 @@ class GuildConfig(BaseModel):
     profiles: list[FilterProfile] = Field(default_factory=list)
     info_channel_id: int | None = None
     info_message_id: int | None = None
+    help_channel_id: int | None = None
+    help_message_ids: list[int] = Field(default_factory=list)
 
     def channel_id(self, role: ChannelRole) -> int | None:
         return self.channels.get(role)
