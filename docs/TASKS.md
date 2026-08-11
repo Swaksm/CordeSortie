@@ -20,9 +20,9 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 2 — Stockage
 
-- [ ] Schéma SQLite (`seen_items`, `scrape_runs`)
-- [ ] Migration/init DB au démarrage
-- [ ] Fonctions de dédup (clé stable par item)
+- [x] Schéma SQLite (`seen_items`, `scrape_runs`)
+- [x] Migration/init DB au démarrage
+- [x] Fonctions de dédup (clé stable par item)
 
 ## Phase 3 — Moteur de filtres
 
