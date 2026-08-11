@@ -24,8 +24,10 @@ class CordeSortieBot(commands.Bot):
         await self.db.connect()
 
         from .commands.config_commands import ConfigCog
+        from .commands.filter_commands import FilterCog
 
         await self.add_cog(ConfigCog(self))
+        await self.add_cog(FilterCog(self))
 
     async def close(self) -> None:
         await self.db.close()

@@ -26,10 +26,10 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 3 — Moteur de filtres
 
-- [ ] Grammaire de filtre : `contient`, `ET`, `OU`, `NON`, parenthèses
-- [ ] Parser + évaluateur, avec tests unitaires sur des cas ambigus
-- [ ] Support `prix_min` / `prix_max` / `only_available`
-- [ ] Commandes `/filtre add`, `/filtre list`, `/filtre remove`, `/filtre test <texte>`
+- [x] Grammaire de filtre : `contient`, `ET`, `OU`, `NON`, parenthèses
+- [x] Parser + évaluateur, avec tests unitaires sur des cas ambigus
+- [x] Support `prix_min` / `prix_max` / `only_available`
+- [x] Commandes `/filtre add`, `/filtre list`, `/filtre remove`, `/filtre test <texte>`
       (mode dry-run pour valider un filtre sur un item fictif)
 
 ## Phase 4 — Scraper engine
