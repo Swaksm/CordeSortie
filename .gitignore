@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Secrets / env
+.env
+
+# Data locale (config par serveur, DB)
+data/
+*.sqlite3
+*.db
+
+# Playwright
+.playwright-cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
