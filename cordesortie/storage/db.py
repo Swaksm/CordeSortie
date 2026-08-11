@@ -1,7 +1,12 @@
 """Accès SQLite asynchrone : historique des items vus (dédup) et runs de scrape.
 
-Un seul fichier DB pour tout le bot (pas par serveur) — l'existence d'un item sur
-un site n'a pas de sens "par serveur Discord", contrairement à la config des filtres.
+Un seul fichier DB pour tout le bot (pas par serveur).
+
+La dédup est scopée par (alert_channel_id, site, item_key) et non par (site,
+item_key) seul : deux profils de filtre différents qui matchent le même item
+doivent chacun recevoir leur propre alerte dans leur propre salon, avec leur
+propre historique de dédup — alert_channel_id est un identifiant stable et
+unique par profil (voir docs/ARCHITECTURE.md).
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from .models import UpsertResult
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS seen_items (
+    alert_channel_id INTEGER NOT NULL,
     site TEXT NOT NULL,
     item_key TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -22,7 +28,7 @@ CREATE TABLE IF NOT EXISTS seen_items (
     available INTEGER NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
-    PRIMARY KEY (site, item_key)
+    PRIMARY KEY (alert_channel_id, site, item_key)
 );
 
 CREATE TABLE IF NOT EXISTS scrape_runs (
@@ -74,6 +80,7 @@ class Database:
     async def upsert_seen_item(
         self,
         *,
+        alert_channel_id: int,
         site: str,
         item_key: str,
         title: str,
@@ -85,17 +92,19 @@ class Database:
         docs/PRD.md §3.5 (anti-doublon)."""
         now = _now()
         async with self.conn.execute(
-            "SELECT price, available FROM seen_items WHERE site = ? AND item_key = ?",
-            (site, item_key),
+            """SELECT price, available FROM seen_items
+               WHERE alert_channel_id = ? AND site = ? AND item_key = ?""",
+            (alert_channel_id, site, item_key),
         ) as cursor:
             row = await cursor.fetchone()
 
         if row is None:
             await self.conn.execute(
                 """INSERT INTO seen_items
-                   (site, item_key, title, price, available, first_seen_at, last_seen_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (site, item_key, title, price, int(available), now, now),
+                   (alert_channel_id, site, item_key, title, price, available,
+                    first_seen_at, last_seen_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (alert_channel_id, site, item_key, title, price, int(available), now, now),
             )
             await self.conn.commit()
             return UpsertResult(is_new=True, changed=True)
@@ -108,8 +117,8 @@ class Database:
         await self.conn.execute(
             """UPDATE seen_items
                SET title = ?, price = ?, available = ?, last_seen_at = ?
-               WHERE site = ? AND item_key = ?""",
-            (title, price, int(available), now, site, item_key),
+               WHERE alert_channel_id = ? AND site = ? AND item_key = ?""",
+            (title, price, int(available), now, alert_channel_id, site, item_key),
         )
         await self.conn.commit()
         return UpsertResult(is_new=False, changed=changed)
@@ -131,3 +140,11 @@ class Database:
             (site, started_at, finished_at, items_found, matched, error),
         )
         await self.conn.commit()
+
+    async def runs_since(self, since_iso: str) -> list[aiosqlite.Row]:
+        async with self.conn.execute(
+            """SELECT site, items_found, matched, error FROM scrape_runs
+               WHERE started_at >= ? ORDER BY started_at""",
+            (since_iso,),
+        ) as cursor:
+            return await cursor.fetchall()

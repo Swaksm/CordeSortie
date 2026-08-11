@@ -13,6 +13,7 @@ import re
 
 from playwright.async_api import ElementHandle, Page
 
+from ..browser import raise_if_blocked
 from ..models import Item
 
 SEARCH_URL = "https://www.carrefour.fr/s?q=pokemon"
@@ -27,6 +28,7 @@ class CarrefourAdapter:
         await page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=30000)
         # La grille de résultats est peuplée en JS après le chargement initial.
         await page.wait_for_timeout(2000)
+        raise_if_blocked(page, self.name)
 
         cards = await page.query_selector_all(CARD_SELECTOR)
 

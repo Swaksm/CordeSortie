@@ -12,6 +12,7 @@ import re
 
 from playwright.async_api import ElementHandle, Page
 
+from ..browser import raise_if_blocked
 from ..models import Item
 
 SEARCH_URL = "https://www.e.leclerc/recherche?q=pokemon"
@@ -25,6 +26,7 @@ class LeclercAdapter:
     async def fetch_items(self, page: Page) -> list[Item]:
         await page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(2000)
+        raise_if_blocked(page, self.name)
 
         cards = await page.query_selector_all(CARD_SELECTOR)
 

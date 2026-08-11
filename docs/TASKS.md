@@ -57,21 +57,34 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 5 — Scheduler & anti-détection
 
-- [ ] Boucle asyncio par site, plancher dur 60s codé en dur (pas contournable via config)
-- [ ] Jitter sur l'intervalle de scrape
-- [ ] Backoff exponentiel + jitter sur erreurs/blocages détectés
-- [ ] Commande `/config set-interval <site|profil> <minutes>` avec validation du plancher
-- [ ] Détection explicite de page de challenge/captcha → log + pause du site concerné
+- [x] Boucle asyncio par (serveur, site) — `SchedulerManager`, une tâche par site
+      actif, recalculées à chaque `/filtre add|remove` (pas de polling périodique)
+- [x] Plancher dur 60s codé en dur (`_HARD_FLOOR_SECONDS`, indépendant de la config)
+- [x] Jitter sur l'intervalle de scrape (±15%) et sur le log
+- [x] Backoff exponentiel + jitter sur erreurs/blocages détectés (jusqu'à 60 min max)
+- [x] Intervalle configurable par profil via `/filtre add interval_minutes` (pas de
+      commande séparée `/config set-interval` — le profil suffit, cf. décision
+      ARCHITECTURE.md §5)
+- [x] Détection explicite de page de challenge/captcha (`BlockedError`, domaines
+      Datadome/hCaptcha/Cloudflare connus) → log + backoff du site concerné
+- [x] Testé en direct : scheduler tourne, scrape 4 sites/minute, `scrape_runs`
+      correctement peuplée
 
 ## Phase 6 — Alertes & log
 
-- [ ] Notifier : embed Discord pour chaque item matché, envoyé dans le salon d'alerte
+- [x] Notifier : embed Discord pour chaque item matché, envoyé dans le salon d'alerte
       dédié du profil (`profile.alert_channel_id`)
-- [ ] Anti-doublon (ne pas re-notifier un item inchangé)
-- [ ] Notification si prix change ou item redevient disponible
-- [ ] Log périodique (salon log), intervalle configurable indépendamment du scrape
-- [ ] Gestion des erreurs remontées dans le log (site down, adapter cassé)
-- [ ] Commande `/pause` : coupe immédiatement tout scraping (tous sites)
+- [x] Anti-doublon scopé par profil (`alert_channel_id`), pas juste par site — deux
+      profils qui matchent le même item sont notifiés indépendamment (voir
+      `tests/test_storage.py`)
+- [x] Notification si prix change ou item redevient disponible
+- [x] Log périodique (salon log), intervalle configurable indépendamment du scrape
+      (`config.log_interval_minutes`)
+- [x] Gestion des erreurs remontées dans le log (site down, adapter cassé, blocage)
+- [x] Commande `/pause` + `/resume` : coupe/reprend immédiatement tout scraping
+- [x] Testé en direct sur Discord : alerte reçue pour un filtre large
+      (`contient("pokemon")`), confirmée que la dédup empêche le spam au cycle
+      suivant
 
 ## Phase 7 — Durcissement / qualité
 

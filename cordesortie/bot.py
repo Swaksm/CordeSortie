@@ -7,6 +7,8 @@ import discord
 from discord.ext import commands
 
 from .config import ConfigStore
+from .scheduler import SchedulerManager
+from .scraper import BrowserManager
 from .storage import Database
 
 logger = logging.getLogger("cordesortie")
@@ -19,17 +21,25 @@ class CordeSortieBot(commands.Bot):
         data_dir = Path(data_dir)
         self.config_store = ConfigStore(data_dir)
         self.db = Database(data_dir / "cordesortie.db")
+        self.browser = BrowserManager()
+        self.scheduler = SchedulerManager(self)
+        self.paused = False
 
     async def setup_hook(self) -> None:
         await self.db.connect()
+        await self.browser.start()
 
         from .commands.config_commands import ConfigCog
+        from .commands.control_commands import ControlCog
         from .commands.filter_commands import FilterCog
 
         await self.add_cog(ConfigCog(self))
         await self.add_cog(FilterCog(self))
+        await self.add_cog(ControlCog(self))
 
     async def close(self) -> None:
+        await self.scheduler.stop_all()
+        await self.browser.stop()
         await self.db.close()
         await super().close()
 
@@ -47,3 +57,7 @@ class CordeSortieBot(commands.Bot):
                 logger.info("Commandes synchronisées sur %s : %d", guild.name, len(synced))
             except discord.HTTPException:
                 logger.exception("Échec de synchronisation des commandes sur %s", guild.name)
+
+        # Idempotent : rappeler on_ready après une reconnexion ne duplique pas
+        # les tâches déjà en cours (voir SchedulerManager.refresh_guild).
+        await self.scheduler.refresh_all()

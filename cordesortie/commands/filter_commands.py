@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..sites import SUPPORTED_SITES
-from ..scraper import REGISTRY, BrowserManager
+from ..scraper import REGISTRY
 from .alert_channels import create_alert_channel, delete_alert_channel
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
@@ -151,6 +151,8 @@ class FilterCog(commands.Cog):
         except discord.HTTPException:
             logger.warning("Mise à jour du salon info impossible")
 
+        await self.bot.scheduler.refresh_guild(interaction.guild_id)
+
         await interaction.followup.send(
             f"Profil **{name}** créé sur {', '.join(site_list)}. "
             f"Alertes dans {channel.mention}.",
@@ -194,6 +196,8 @@ class FilterCog(commands.Cog):
             await update_info_channel(interaction.guild, config, store, interaction.guild_id)
         except discord.HTTPException:
             logger.warning("Mise à jour du salon info impossible")
+
+        await self.bot.scheduler.refresh_guild(interaction.guild_id)
 
         await interaction.response.send_message(
             f"Profil **{name}** supprimé.{note}", ephemeral=True
@@ -277,48 +281,49 @@ class FilterCog(commands.Cog):
         lines: list[str] = []
         total_matches = 0
 
-        async with BrowserManager() as bm:
-            for site in profile.sites:
-                adapter = REGISTRY.get(site)
-                if adapter is None:
-                    lines.append(f"- **{site}** : adapter pas encore disponible")
-                    continue
+        # Réutilise le navigateur partagé du bot (celui du scheduler) plutôt que
+        # d'en relancer un dédié — cohérent avec docs/ARCHITECTURE.md §2.4.
+        for site in profile.sites:
+            adapter = REGISTRY.get(site)
+            if adapter is None:
+                lines.append(f"- **{site}** : adapter pas encore disponible")
+                continue
 
+            try:
+                page = await self.bot.browser.new_page()
                 try:
-                    page = await bm.new_page()
-                    try:
-                        items = await adapter.fetch_items(page)
-                    finally:
-                        await page.close()
-                except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
-                    logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
-                    lines.append(f"- **{site}** : erreur de scrape ({exc})")
-                    continue
+                    items = await adapter.fetch_items(page)
+                finally:
+                    await page.close()
+            except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
+                logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
+                lines.append(f"- **{site}** : erreur de scrape ({exc})")
+                continue
 
-                matches = [
-                    item
-                    for item in items
-                    if matches_item(
-                        node,
-                        text=item.text,
-                        price=item.price,
-                        available=item.available,
-                        price_min=profile.price_min,
-                        price_max=profile.price_max,
-                        only_available=profile.only_available,
-                    )
-                ]
-                total_matches += len(matches)
-                lines.append(
-                    f"- **{site}** : {len(items)} item(s) scrapé(s), {len(matches)} match(s)"
+            matches = [
+                item
+                for item in items
+                if matches_item(
+                    node,
+                    text=item.text,
+                    price=item.price,
+                    available=item.available,
+                    price_min=profile.price_min,
+                    price_max=profile.price_max,
+                    only_available=profile.only_available,
                 )
-                for item in matches[:_DRY_RUN_MAX_ITEMS_PER_SITE]:
-                    price_str = f"{item.price} €" if item.price is not None else "prix inconnu"
-                    lines.append(f"  - {item.title} — {price_str} — <{item.url}>")
-                if len(matches) > _DRY_RUN_MAX_ITEMS_PER_SITE:
-                    lines.append(
-                        f"  - … et {len(matches) - _DRY_RUN_MAX_ITEMS_PER_SITE} de plus"
-                    )
+            ]
+            total_matches += len(matches)
+            lines.append(
+                f"- **{site}** : {len(items)} item(s) scrapé(s), {len(matches)} match(s)"
+            )
+            for item in matches[:_DRY_RUN_MAX_ITEMS_PER_SITE]:
+                price_str = f"{item.price} €" if item.price is not None else "prix inconnu"
+                lines.append(f"  - {item.title} — {price_str} — <{item.url}>")
+            if len(matches) > _DRY_RUN_MAX_ITEMS_PER_SITE:
+                lines.append(
+                    f"  - … et {len(matches) - _DRY_RUN_MAX_ITEMS_PER_SITE} de plus"
+                )
 
         header = f"**Dry-run : {profile.name}** — {total_matches} match(s) au total\n"
         body = "\n".join(lines)

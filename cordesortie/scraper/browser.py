@@ -9,10 +9,26 @@ from __future__ import annotations
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
+from .errors import BlockedError
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+
+# Domaines connus de prestataires de challenge antibot — si l'URL finale d'une
+# page en fait partie, on n'a pas eu le contenu attendu mais un CAPTCHA.
+_BLOCKED_URL_MARKERS = (
+    "captcha-delivery.com",
+    "hcaptcha.com",
+    "geo.captcha",
+    "challenges.cloudflare.com",
+)
+
+
+def raise_if_blocked(page: Page, site: str) -> None:
+    if any(marker in page.url for marker in _BLOCKED_URL_MARKERS):
+        raise BlockedError(f"{site} : page bloquée par un challenge antibot ({page.url})")
 
 
 class BrowserManager:
