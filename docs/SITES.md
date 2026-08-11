@@ -5,9 +5,10 @@ jour au fur et à mesure de l'implémentation de chaque adapter.
 
 | Site      | Statut adapter | Antibot connu               | Notes |
 |-----------|-----------------|------------------------------|-------|
+| Carrefour | **Fait**        | Aucun rencontré en test      | Recherche `?q=pokemon`, cartes `article[data-testid=<EAN>]`. Le moteur de recherche exclut déjà les produits indisponibles côté API (`displayUnavailable=false`) → tous les items renvoyés sont marqués `available=True`, pas de vraie détection de rupture pour ce site. Sélecteurs relevés le 2026-08-11. |
+| JouéClub  | **Fait**        | Aucun rencontré en test      | Recherche `?searchText=pokemon`. Vraie disponibilité en ligne exposée (`.product__stockIcon-card`, statut "Web" vs "En magasin") → seul site pour l'instant avec une dédup rupture/redispo fiable. Sélecteurs relevés le 2026-08-12. |
 | Auchan    | À faire         | À évaluer                   | Recherche produit via leur moteur de recherche interne. |
 | Leclerc   | À faire         | À évaluer                   | Multi-magasins (e.leclerc) — vérifier si stock est national ou par magasin. |
-| Carrefour | À faire         | À évaluer                   | Historiquement protégé (Akamai/Datadome selon les périodes) — commencer par ce site pour valider l'approche Playwright. |
 | Fnac      | À faire         | À évaluer                   | Souvent une cible prioritaire pour les produits Pokémon (forte demande = forte protection anti-bot probable). |
 | Autre ?   | —               | —                            | Compléter (Cultura, Micromania, Cdiscount, TF1 Games, sites officiels Pokémon Center EU...) selon les besoins. |
 

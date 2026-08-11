@@ -1,16 +1,10 @@
-# NOTE : ce Dockerfile installe seulement les dépendances actuelles du bot
-# (discord.py, pydantic, python-dotenv). Quand la Phase 4 (scraper Playwright,
-# voir docs/TASKS.md) sera codée, il faudra ajouter :
-#   RUN playwright install --with-deps chromium
-# après l'installation des paquets Python, pour que Chromium et ses
-# dépendances système soient présents dans l'image.
-
 FROM python:3.13-slim
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN playwright install --with-deps chromium
 
 COPY cordesortie ./cordesortie
 

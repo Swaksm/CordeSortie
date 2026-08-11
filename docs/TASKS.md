@@ -36,10 +36,13 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 4 — Scraper engine
 
-- [ ] Interface `SiteAdapter` + registre de sites disponibles
-- [ ] Setup Playwright (contexte navigateur partagé, gestion cookies)
-- [ ] Premier adapter (Carrefour recommandé comme site de validation, voir SITES.md)
-- [ ] Normalisation `Item` (titre, prix, dispo, url, image)
+- [x] Interface `SiteAdapter` + registre de sites disponibles
+- [x] Setup Playwright (contexte navigateur partagé, gestion cookies)
+- [x] Premier adapter (Carrefour) — testé en direct sur le site, 30 items, prix
+      et titres corrects
+- [x] Normalisation `Item` (titre, prix, dispo, url, image)
+- [x] Adapter JouéClub (hors plan initial, ajouté car dispo web fiable) — testé en
+      direct, 26 items dont 6 correctement détectés indisponibles
 - [ ] Adapters Auchan, Leclerc, Fnac
 
 ## Phase 5 — Scheduler & anti-détection
@@ -72,11 +75,11 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 - [x] `Dockerfile` (build + import testés en local avec Docker)
 - [x] Repo GitHub créé et code poussé (nécessaire pour connecter Render)
+- [x] `playwright install --with-deps chromium` dans le Dockerfile, scraper Carrefour
+      testé et fonctionnel à l'intérieur du conteneur
 - [ ] Service Render "Background Worker" créé, connecté au repo
 - [ ] `DISCORD_TOKEN` configuré en variable d'environnement Render (jamais commité)
 - [ ] Render Disk monté sur `/data` (doit matcher `DATA_DIR=/data` du Dockerfile)
-- [ ] Mettre à jour le Dockerfile avec `playwright install --with-deps chromium`
-      une fois la Phase 4 (scraper) codée
 
 ## Backlog / v2 (hors MVP)
 
