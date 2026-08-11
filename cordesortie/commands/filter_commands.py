@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
+from ..notifier import log_event
 from ..sites import SUPPORTED_SITES
 from ..scraper import REGISTRY
 from .alert_channels import create_alert_channel, delete_alert_channel
@@ -153,6 +154,13 @@ class FilterCog(commands.Cog):
 
         await self.bot.scheduler.refresh_guild(interaction.guild_id)
 
+        await log_event(
+            self.bot,
+            interaction.guild,
+            f"🆕 Filtre **{name}** créé — sites: {', '.join(site_list)}, "
+            f"intervalle {interval} min, par {interaction.user.mention}",
+        )
+
         await interaction.followup.send(
             f"Profil **{name}** créé sur {', '.join(site_list)}. "
             f"Alertes dans {channel.mention}.",
@@ -198,6 +206,8 @@ class FilterCog(commands.Cog):
             logger.warning("Mise à jour du salon info impossible")
 
         await self.bot.scheduler.refresh_guild(interaction.guild_id)
+
+        await log_event(self.bot, interaction.guild, f"🗑️ Filtre **{name}** supprimé")
 
         await interaction.response.send_message(
             f"Profil **{name}** supprimé.{note}", ephemeral=True

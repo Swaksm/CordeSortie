@@ -14,11 +14,9 @@ import random
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-import discord
-
 from ..config import ChannelRole
 from ..filters import FilterSyntaxError, matches_item, parse_filter
-from ..notifier import send_alert, send_log_summary
+from ..notifier import get_log_channel, log_event, send_alert, send_log_summary
 from ..scraper import REGISTRY
 from ..scraper.errors import BlockedError
 
@@ -183,6 +181,15 @@ class SchedulerManager:
             )
 
             if error is not None:
+                await log_event(self.bot, guild, f"⚠️ **{site}** : erreur — {error}")
+            else:
+                await log_event(
+                    self.bot,
+                    guild,
+                    f"🔍 **{site}** : {len(items)} item(s), {matched_total} match(s)",
+                )
+
+            if error is not None:
                 backoff_minutes = min(
                     interval_minutes * (2 ** min(consecutive_errors, 5)), _MAX_BACKOFF_MINUTES
                 )
@@ -206,8 +213,8 @@ class SchedulerManager:
             guild = self.bot.get_guild(guild_id)
             if guild is None:
                 continue
-            channel = guild.get_channel(log_channel_id)
-            if not isinstance(channel, discord.TextChannel):
+            channel = await get_log_channel(self.bot, guild)
+            if channel is None:
                 continue
 
             runs = await self.bot.db.runs_since(last_check)

@@ -85,6 +85,9 @@ c'est la référence pour savoir où on en est, pas la conversation.
       profils qui matchent le même item sont notifiés indépendamment (voir
       `tests/test_storage.py`)
 - [x] Notification si prix change ou item redevient disponible
+- [x] Flux d'évènements en direct dans le salon log (hors plan initial, demandé en
+      plus du résumé périodique) : création/suppression de filtre, résultat concis
+      de chaque cycle de scrape (`log_event()` dans `notifier.py`)
 - [x] Log périodique (salon log), intervalle configurable indépendamment du scrape
       (`config.log_interval_minutes`)
 - [x] Gestion des erreurs remontées dans le log (site down, adapter cassé, blocage)

@@ -1,18 +1,24 @@
-"""Envoi des alertes (salon dédié par profil) et du résumé périodique (salon log).
+"""Envoi des alertes (salon dédié par profil), du flux d'évènements en direct et du
+résumé périodique (les deux dans le salon log).
 
 Ne fait pas partie de scheduler/ car ce module ne connaît rien à la boucle de
-scrape — il reçoit juste "cet item matche ce profil" ou "voici les runs récents"
-et s'occupe de la mise en forme + de l'envoi Discord.
+scrape — il reçoit juste "cet item matche ce profil", "voici un évènement à
+journaliser" ou "voici les runs récents", et s'occupe de la mise en forme + de
+l'envoi Discord.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import discord
 
-from .config import FilterProfile
+from .config import ChannelRole, FilterProfile
 from .scraper import Item
+
+if TYPE_CHECKING:
+    from .bot import CordeSortieBot
 
 logger = logging.getLogger("cordesortie")
 
@@ -50,6 +56,28 @@ async def send_alert(guild: discord.Guild, profile: FilterProfile, item: Item) -
         await channel.send(embed=build_alert_embed(item, profile))
     except discord.HTTPException:
         logger.warning("Échec d'envoi de l'alerte pour %s dans %s", profile.name, channel.id)
+
+
+async def get_log_channel(bot: CordeSortieBot, guild: discord.Guild) -> discord.TextChannel | None:
+    config = bot.config_store.load(guild.id)
+    channel_id = config.channel_id(ChannelRole.LOG)
+    if channel_id is None:
+        return None
+    channel = guild.get_channel(channel_id)
+    return channel if isinstance(channel, discord.TextChannel) else None
+
+
+async def log_event(bot: CordeSortieBot, guild: discord.Guild, message: str) -> None:
+    """Poste un évènement concis et immédiat dans le salon log (création/suppression
+    de filtre, résultat d'un cycle de scrape...) — flux en direct, distinct du résumé
+    périodique agrégé (`send_log_summary`)."""
+    channel = await get_log_channel(bot, guild)
+    if channel is None:
+        return
+    try:
+        await channel.send(message)
+    except discord.HTTPException:
+        logger.warning("Échec d'envoi de l'évènement log dans %s", channel.id)
 
 
 def format_log_summary(runs: list) -> str:
