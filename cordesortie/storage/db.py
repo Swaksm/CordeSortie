@@ -148,3 +148,13 @@ class Database:
             (since_iso,),
         ) as cursor:
             return await cursor.fetchall()
+
+    async def count_seen_items(self, alert_channel_id: int) -> int:
+        """Nombre total d'items distincts déjà matchés par ce profil (toutes
+        éditions confondues) — utilisé par /stats."""
+        async with self.conn.execute(
+            "SELECT COUNT(*) AS n FROM seen_items WHERE alert_channel_id = ?",
+            (alert_channel_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row["n"] if row else 0

@@ -33,11 +33,13 @@ class CordeSortieBot(commands.Bot):
         from .commands.control_commands import ControlCog
         from .commands.filter_commands import FilterCog
         from .commands.site_commands import SiteCog
+        from .commands.stats_commands import StatsCog
 
         await self.add_cog(ConfigCog(self))
         await self.add_cog(FilterCog(self))
         await self.add_cog(ControlCog(self))
         await self.add_cog(SiteCog())
+        await self.add_cog(StatsCog(self))
 
     async def close(self) -> None:
         await self.scheduler.stop_all()

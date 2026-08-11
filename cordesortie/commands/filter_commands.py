@@ -51,6 +51,7 @@ class FilterCog(commands.Cog):
             f"Intervalle de scrape en minutes (défaut : {DEFAULT_SCRAPE_INTERVAL_MINUTES}, "
             "minimum 1)"
         ),
+        private="Salon visible uniquement par toi + les admins (défaut : non, visible par tout le serveur)",
     )
     @app_commands.default_permissions(manage_guild=True)
     async def add(
@@ -63,6 +64,7 @@ class FilterCog(commands.Cog):
         price_max: float | None = None,
         only_available: bool = True,
         interval_minutes: int | None = None,
+        private: bool = False,
     ) -> None:
         interval = interval_minutes if interval_minutes is not None else DEFAULT_SCRAPE_INTERVAL_MINUTES
 
@@ -97,6 +99,7 @@ class FilterCog(commands.Cog):
                 price_min=price_min,
                 price_max=price_max,
                 only_available=only_available,
+                private=private,
             )
         except ValidationError as exc:
             await interaction.response.send_message(
@@ -108,7 +111,10 @@ class FilterCog(commands.Cog):
 
         try:
             channel = await create_alert_channel(
-                interaction.guild, creator_name=interaction.user.name, profile_name=name
+                interaction.guild,
+                creator=interaction.user,
+                profile_name=name,
+                private=private,
             )
         except discord.Forbidden:
             await interaction.followup.send(
@@ -133,6 +139,7 @@ class FilterCog(commands.Cog):
             price_min=price_min,
             price_max=price_max,
             only_available=only_available,
+            private=private,
         )
         config.profiles.append(profile)
         store.save(interaction.guild_id, config)
@@ -218,6 +225,159 @@ class FilterCog(commands.Cog):
         await interaction.response.send_message(
             f"Profil **{name}** supprimé.{note}", ephemeral=True
         )
+
+    @filtre_group.command(name="edit", description="Modifier un profil de filtre existant")
+    @app_commands.describe(
+        name="Nom du profil à modifier",
+        expression="Nouvelle expression de filtre (optionnel, sinon inchangé)",
+        sites="Nouveaux sites séparés par des virgules (optionnel, sinon inchangé)",
+        price_min="Nouveau prix minimum (optionnel, sinon inchangé)",
+        price_max="Nouveau prix maximum (optionnel, sinon inchangé)",
+        only_available="N'alerter que si disponible (optionnel, sinon inchangé)",
+        interval_minutes="Nouvel intervalle de scrape en minutes (optionnel, sinon inchangé)",
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def edit(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        expression: str | None = None,
+        sites: str | None = None,
+        price_min: float | None = None,
+        price_max: float | None = None,
+        only_available: bool | None = None,
+        interval_minutes: int | None = None,
+    ) -> None:
+        if interaction.guild_id is None or interaction.guild is None:
+            await interaction.response.send_message(
+                "Cette commande doit être utilisée dans un serveur.", ephemeral=True
+            )
+            return
+
+        if all(
+            v is None
+            for v in (expression, sites, price_min, price_max, only_available, interval_minutes)
+        ):
+            await interaction.response.send_message(
+                "Aucun changement fourni. Précise au moins un paramètre à modifier.",
+                ephemeral=True,
+            )
+            return
+
+        store = self.bot.config_store
+        config = store.load(interaction.guild_id)
+        profile = config.get_profile(name)
+
+        if profile is None:
+            await interaction.response.send_message(
+                f"Aucun profil nommé **{name}**.", ephemeral=True
+            )
+            return
+
+        # Note : il n'y a pas moyen d'effacer price_min/price_max via /filtre edit
+        # (None signifie "inchangé" ici) — remove + add si besoin de les retirer.
+        updated_fields = profile.model_dump()
+        if expression is not None:
+            updated_fields["filter_expression"] = expression
+        if sites is not None:
+            updated_fields["sites"] = [s.strip().lower() for s in sites.split(",") if s.strip()]
+        if price_min is not None:
+            updated_fields["price_min"] = price_min
+        if price_max is not None:
+            updated_fields["price_max"] = price_max
+        if only_available is not None:
+            updated_fields["only_available"] = only_available
+        if interval_minutes is not None:
+            updated_fields["scrape_interval_minutes"] = interval_minutes
+
+        try:
+            new_profile = FilterProfile(**updated_fields)
+        except ValidationError as exc:
+            await interaction.response.send_message(
+                f"Modification invalide :\n{_format_validation_error(exc)}", ephemeral=True
+            )
+            return
+
+        config.profiles[config.profiles.index(profile)] = new_profile
+        store.save(interaction.guild_id, config)
+
+        try:
+            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+        except discord.HTTPException:
+            logger.warning("Mise à jour du salon info impossible")
+
+        try:
+            await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+        await log_event(
+            self.bot, interaction.guild, f"✏️ Filtre **{name}** modifié par {interaction.user.mention}"
+        )
+
+        await interaction.response.send_message(
+            f"Profil **{name}** mis à jour.\n{format_profile_line(new_profile)}", ephemeral=True
+        )
+
+    async def _set_paused(
+        self, interaction: discord.Interaction, name: str, *, paused: bool
+    ) -> None:
+        if interaction.guild_id is None or interaction.guild is None:
+            await interaction.response.send_message(
+                "Cette commande doit être utilisée dans un serveur.", ephemeral=True
+            )
+            return
+
+        store = self.bot.config_store
+        config = store.load(interaction.guild_id)
+        profile = config.get_profile(name)
+
+        if profile is None:
+            await interaction.response.send_message(
+                f"Aucun profil nommé **{name}**.", ephemeral=True
+            )
+            return
+
+        if profile.paused == paused:
+            already = "déjà en pause" if paused else "déjà actif"
+            await interaction.response.send_message(
+                f"Profil **{name}** {already}.", ephemeral=True
+            )
+            return
+
+        config.profiles[config.profiles.index(profile)] = profile.model_copy(
+            update={"paused": paused}
+        )
+        store.save(interaction.guild_id, config)
+
+        try:
+            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+        except discord.HTTPException:
+            logger.warning("Mise à jour du salon info impossible")
+
+        try:
+            await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+        verb, emoji = ("mis en pause", "⏸️") if paused else ("repris", "▶️")
+        await log_event(self.bot, interaction.guild, f"{emoji} Filtre **{name}** {verb}")
+
+        await interaction.response.send_message(f"Profil **{name}** {verb}.", ephemeral=True)
+
+    @filtre_group.command(
+        name="pause", description="Met en pause un seul profil de filtre (pas tout le bot)"
+    )
+    @app_commands.describe(name="Nom du profil à mettre en pause")
+    @app_commands.default_permissions(manage_guild=True)
+    async def pause_filter(self, interaction: discord.Interaction, name: str) -> None:
+        await self._set_paused(interaction, name, paused=True)
+
+    @filtre_group.command(name="resume", description="Reprend un profil de filtre en pause")
+    @app_commands.describe(name="Nom du profil à reprendre")
+    @app_commands.default_permissions(manage_guild=True)
+    async def resume_filter(self, interaction: discord.Interaction, name: str) -> None:
+        await self._set_paused(interaction, name, paused=False)
 
     @filtre_group.command(name="list", description="Lister les profils de filtre")
     @app_commands.default_permissions(manage_guild=True)

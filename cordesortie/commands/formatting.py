@@ -15,11 +15,20 @@ def _bounds_str(profile: FilterProfile) -> str:
     return f" ({', '.join(bounds)})" if bounds else ""
 
 
+def _badges(profile: FilterProfile) -> str:
+    badges = []
+    if profile.private:
+        badges.append("🔒")
+    if profile.paused:
+        badges.append("⏸️")
+    return f"{''.join(badges)} " if badges else ""
+
+
 def format_profile_line(profile: FilterProfile) -> str:
     dispo = "disponible uniquement" if profile.only_available else "avec rupture"
     bounds_str = _bounds_str(profile)
     return (
-        f"- **{profile.name}** — sites: {', '.join(profile.sites)} — "
+        f"- {_badges(profile)}**{profile.name}** — sites: {', '.join(profile.sites)} — "
         f"`{profile.filter_expression}`{bounds_str} — {dispo} — "
         f"scrape toutes les {profile.scrape_interval_minutes} min — "
         f"<#{profile.alert_channel_id}>"

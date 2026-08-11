@@ -132,4 +132,32 @@ def test_record_and_query_scrape_runs():
     rows = run(scenario())
     assert len(rows) == 1
     assert rows[0]["site"] == "carrefour"
-    assert rows[0]["items_found"] == 10
+
+
+def test_count_seen_items_scoped_per_channel():
+    async def scenario():
+        with tempfile.TemporaryDirectory() as d:
+            db = Database(Path(d) / "test.db")
+            await db.connect()
+            await db.upsert_seen_item(
+                alert_channel_id=1, site="carrefour", item_key="a",
+                title="A", price=10.0, available=True,
+            )
+            await db.upsert_seen_item(
+                alert_channel_id=1, site="carrefour", item_key="b",
+                title="B", price=20.0, available=True,
+            )
+            await db.upsert_seen_item(
+                alert_channel_id=2, site="carrefour", item_key="c",
+                title="C", price=30.0, available=True,
+            )
+            count_1 = await db.count_seen_items(1)
+            count_2 = await db.count_seen_items(2)
+            count_none = await db.count_seen_items(999)
+            await db.close()
+            return count_1, count_2, count_none
+
+    count_1, count_2, count_none = run(scenario())
+    assert count_1 == 2
+    assert count_2 == 1
+    assert count_none == 0

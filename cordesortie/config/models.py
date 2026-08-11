@@ -26,6 +26,8 @@ class FilterProfile(BaseModel):
     price_min: float | None = None
     price_max: float | None = None
     only_available: bool = True
+    private: bool = False
+    paused: bool = False
 
     @field_validator("filter_expression")
     @classmethod

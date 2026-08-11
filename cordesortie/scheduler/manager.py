@@ -71,6 +71,8 @@ class SchedulerManager:
 
         site_intervals: dict[str, int] = {}
         for profile in config.profiles:
+            if profile.paused:
+                continue
             for site in profile.sites:
                 if site not in REGISTRY:
                     continue
@@ -119,9 +121,9 @@ class SchedulerManager:
                 await asyncio.sleep(_HARD_FLOOR_SECONDS)
                 continue
 
-            profiles = [p for p in config.profiles if site in p.sites]
+            profiles = [p for p in config.profiles if site in p.sites and not p.paused]
             if not profiles:
-                return  # plus aucun profil ne cible ce site : la tâche s'arrête
+                return  # plus aucun profil actif ne cible ce site : la tâche s'arrête
 
             interval_minutes = min(p.scrape_interval_minutes for p in profiles)
 

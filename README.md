@@ -15,16 +15,20 @@ phase.
 ## Fonctionnalités
 
 - **Filtres par commande Discord** : expressions `contient("X") ET/OU/NON contient("Y")`
-  avec parenthèses, plus prix min/max et disponibilité.
+  avec parenthèses, plus prix min/max et disponibilité. Modifiables après coup
+  (`/filtre edit`) sans supprimer/recréer.
 - **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan fonctionnels. Fnac bloqué par
   un CAPTCHA Datadome (pas d'adapter, volontairement — voir [docs/SITES.md](docs/SITES.md)).
 - **Un salon Discord dédié par filtre**, auto-créé/supprimé, pour ne jamais mélanger
-  les alertes de plusieurs profils.
+  les alertes de plusieurs profils. Optionnellement privé (`private:true`, visible
+  uniquement par le créateur + les admins).
 - **Salon tableau de bord** et **salon d'aide** auto-générés et toujours à jour.
 - **Salon log** : flux d'évènements en direct + résumé périodique.
+- **`/stats`** : statistiques de scrape sur une période + total d'alertes par profil.
 - **Anti-détection** : intervalle de scrape jitté, plancher dur à 1 minute (non
   contournable), backoff exponentiel sur erreur, détection de CAPTCHA/challenge.
-- **`/pause` et `/resume`** pour couper le scraping immédiatement en cas de doute.
+- **`/pause`/`/resume`** (global) et **`/filtre pause`/`/filtre resume`** (par profil)
+  pour couper le scraping en cas de doute.
 
 ## Stack
 

@@ -140,11 +140,29 @@ est prêt et testé, indépendant de la plateforme choisie in fine.
 - [ ] Service créé, connecté au repo, `DISCORD_TOKEN` en variable d'environnement
 - [ ] Volume/disque persistant monté sur `/data`
 
+## Phase 9 — Améliorations post-revue (2026-08-12)
+
+- [x] `/filtre edit` : modifier un profil existant sans le supprimer/recréer
+      (expression, sites, prix, dispo, intervalle). Limite connue : impossible
+      d'effacer price_min/price_max une fois posés (None = "inchangé" dans cette
+      commande) — remove + add si besoin.
+- [x] Salon d'alerte privé (`/filtre add private:true`) : visible uniquement par le
+      créateur (les admins voient toujours tout via la permission Administrator,
+      indépendamment des overwrites). Affiché avec 🔒 dans `/filtre list`.
+- [x] `/stats` : stats de scrape sur une fenêtre de temps (défaut 24h) + total
+      d'alertes historique par profil (`Database.count_seen_items`).
+- [x] `/filtre pause name:X` / `/filtre resume name:X` : pause un seul profil (le
+      site continue d'être scrapé si un autre profil actif le cible aussi).
+      Distinct de `/pause` global. Affiché avec ⏸️ dans `/filtre list`.
+- [x] Cap de longueur de nom de salon (100 car. Discord) : déjà couvert par
+      `slugify()` (tronque à 90) depuis la Phase 3 — verrouillé par tests
+      (`tests/test_alert_channels.py`).
+
+37 tests au total, testé en direct sur Discord (config existante restée compatible,
+aucun reset nécessaire — tous les nouveaux champs ont des valeurs par défaut).
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées
 - [ ] Intervalle de scrape par site (plutôt que global)
 - [ ] Interface web de configuration
-- [ ] Historique/statistiques consultables via commande (`/stats`)
-- [ ] Salon d'alerte par profil en privé (visible uniquement par le créateur du
-      filtre + les admins) au lieu de visible par tout le serveur

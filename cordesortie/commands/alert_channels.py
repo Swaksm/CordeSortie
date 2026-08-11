@@ -3,8 +3,8 @@
 Un salon par profil, nommé <pseudo>-<nom du filtre>, regroupé dans une catégorie
 "Alertes" dédiée — séparée de la catégorie "CordeSortie" (salons info/aide du bot)
 pour ne pas mélanger les alertes avec les salons de pilotage. Visible par tout le
-serveur pour l'instant ; une version privée (créateur du filtre + admins
-uniquement) est notée en backlog.
+serveur par défaut ; `private=True` le restreint au créateur (+ les admins, qui
+voient toujours tout via la permission Administrator, indépendamment des overwrites).
 """
 
 from __future__ import annotations
@@ -16,12 +16,16 @@ import discord
 CATEGORY_NAME = "CordeSortie"
 ALERT_CATEGORY_NAME = "Alertes"
 
+# Discord limite les noms de salon à 100 caractères ; on garde de la marge pour
+# le préfixe pseudo- et un éventuel suffixe de désambiguïsation.
+_MAX_SLUG_LENGTH = 90
+
 
 def slugify(value: str) -> str:
     value = value.lower()
     value = re.sub(r"[^a-z0-9]+", "-", value)
     value = value.strip("-")
-    return value[:90] or "filtre"
+    return value[:_MAX_SLUG_LENGTH] or "filtre"
 
 
 async def get_or_create_category(
@@ -34,13 +38,26 @@ async def get_or_create_category(
 
 
 async def create_alert_channel(
-    guild: discord.Guild, *, creator_name: str, profile_name: str
+    guild: discord.Guild,
+    *,
+    creator: discord.Member,
+    profile_name: str,
+    private: bool = False,
 ) -> discord.TextChannel:
     category = await get_or_create_category(guild, ALERT_CATEGORY_NAME)
-    channel_name = slugify(f"{creator_name}-{profile_name}")
+    channel_name = slugify(f"{creator.name}-{profile_name}")
+
+    overwrites = None
+    if private:
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            creator: discord.PermissionOverwrite(view_channel=True),
+        }
+
     return await guild.create_text_channel(
         channel_name,
         category=category,
+        overwrites=overwrites,
         reason=f"Salon d'alerte pour le profil de filtre '{profile_name}'",
     )
 
