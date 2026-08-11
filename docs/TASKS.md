@@ -14,9 +14,13 @@ c'est la référence pour savoir où on en est, pas la conversation.
 ## Phase 1 — Bot Discord de base
 
 - [x] Connexion bot, enregistrement des slash commands (squelette vide)
-- [x] Commande `/config set-channel <role: config|alerte|log> <#salon>`
-- [x] Persistance de la config de base (channels) dans `data/<guild_id>/config.json`
-- [x] Commande `/config show` (affiche la config actuelle dans le salon config)
+- [x] ~~Commande `/config set-channel <role: config|alerte|log> <#salon>`~~
+      **simplifiée en Phase 7** en `/config set-log-channel` : les rôles "config" et
+      "alerte" n'ont jamais été lus nulle part dans le code (dead code découvert en
+      revue) — les alertes vont dans le salon dédié par profil depuis longtemps, et
+      aucune commande n'a jamais utilisé de "salon config". Seul "log" servait.
+- [x] Persistance de la config de base dans `data/<guild_id>/config.json`
+- [x] Commande `/config show` (affiche la config actuelle en éphémère)
 
 ## Phase 2 — Stockage
 
@@ -109,7 +113,16 @@ c'est la référence pour savoir où on en est, pas la conversation.
       bot en parallèle (outil de gestion de process, pas un bug du bot) —
       nettoyé, à surveiller en usage réel.
 - [ ] Revue anti-détection avant mise en prod longue durée (voir RISKS.md)
-- [ ] Documentation utilisateur finale (README : comment inviter le bot, premiers pas)
+- [x] Documentation utilisateur finale (README : installation, création du bot
+      Discord, premiers pas, commandes, déploiement)
+- [x] Revue complète du code : bugs trouvés et corrigés — rôles de salon "config"/
+      "alerte" morts (supprimés, cf. Phase 1), `/filtre list` sans garde-fou de
+      longueur (pouvait planter sur beaucoup de profils), scheduler qui pouvait
+      mourir silencieusement sur une config corrompue, sites dupliqués dans
+      `/filtre add` non dédupliqués, formulation "Filtres prix (prix >= X)"
+      redondante, mise à jour inutile du message info quand rien ne change,
+      `refresh_guild()` non protégé pouvant laisser une interaction en suspens.
+      Tous corrigés, 30 tests toujours verts, testé en direct sur Discord.
 
 ## Phase 8 — Déploiement (reporté)
 

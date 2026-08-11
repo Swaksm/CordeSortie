@@ -6,8 +6,6 @@ docs/ARCHITECTURE.md.
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, Field, field_validator
 
 from ..filters import FilterSyntaxError, parse_filter
@@ -17,12 +15,6 @@ from ..sites import SUPPORTED_SITES
 # docs/RISKS.md (anti-détection).
 MIN_SCRAPE_INTERVAL_MINUTES = 1
 DEFAULT_SCRAPE_INTERVAL_MINUTES = 5
-
-
-class ChannelRole(str, Enum):
-    CONFIG = "config"
-    ALERTE = "alerte"
-    LOG = "log"
 
 
 class FilterProfile(BaseModel):
@@ -47,15 +39,17 @@ class FilterProfile(BaseModel):
     @field_validator("sites")
     @classmethod
     def _validate_sites(cls, value: list[str]) -> list[str]:
-        unknown = [site for site in value if site not in SUPPORTED_SITES]
+        # Déduplique en préservant l'ordre (ex: "carrefour,carrefour" tapé par erreur).
+        deduped = list(dict.fromkeys(value))
+        unknown = [site for site in deduped if site not in SUPPORTED_SITES]
         if unknown:
             raise ValueError(
                 f"Site(s) inconnu(s) : {', '.join(unknown)}. "
                 f"Sites supportés : {', '.join(SUPPORTED_SITES)}."
             )
-        if not value:
+        if not deduped:
             raise ValueError("Un profil doit cibler au moins un site.")
-        return value
+        return deduped
 
     @field_validator("scrape_interval_minutes")
     @classmethod
@@ -70,16 +64,13 @@ class FilterProfile(BaseModel):
 
 
 class GuildConfig(BaseModel):
-    channels: dict[ChannelRole, int] = Field(default_factory=dict)
+    log_channel_id: int | None = None
     log_interval_minutes: int = 15
     profiles: list[FilterProfile] = Field(default_factory=list)
     info_channel_id: int | None = None
     info_message_id: int | None = None
     help_channel_id: int | None = None
     help_message_ids: list[int] = Field(default_factory=list)
-
-    def channel_id(self, role: ChannelRole) -> int | None:
-        return self.channels.get(role)
 
     def get_profile(self, name: str) -> FilterProfile | None:
         return next((p for p in self.profiles if p.name == name), None)

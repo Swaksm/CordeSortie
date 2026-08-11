@@ -152,7 +152,10 @@ class FilterCog(commands.Cog):
         except discord.HTTPException:
             logger.warning("Mise à jour du salon info impossible")
 
-        await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        try:
+            await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
 
         await log_event(
             self.bot,
@@ -205,7 +208,10 @@ class FilterCog(commands.Cog):
         except discord.HTTPException:
             logger.warning("Mise à jour du salon info impossible")
 
-        await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        try:
+            await self.bot.scheduler.refresh_guild(interaction.guild_id)
+        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
 
         await log_event(self.bot, interaction.guild, f"🗑️ Filtre **{name}** supprimé")
 
@@ -234,7 +240,11 @@ class FilterCog(commands.Cog):
         lines = ["**Profils de filtre**"]
         lines.extend(format_profile_line(profile) for profile in config.profiles)
 
-        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+        message = "\n".join(lines)
+        if len(message) > _DISCORD_MESSAGE_LIMIT:
+            message = message[:_DISCORD_MESSAGE_LIMIT] + "\n… (liste tronquée)"
+
+        await interaction.response.send_message(message, ephemeral=True)
 
     @filtre_group.command(
         name="test", description="Tester une expression de filtre sur un texte fictif"

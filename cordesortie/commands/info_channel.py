@@ -74,7 +74,8 @@ async def update_info_channel(
             message = None
 
     if message is not None:
-        await message.edit(content=summary)
+        if message.content != summary:
+            await message.edit(content=summary)
     else:
         message = await channel.send(summary)
         try:

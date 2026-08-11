@@ -14,7 +14,7 @@ import random
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from ..config import ChannelRole
+from ..config.store import ConfigError
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..notifier import get_log_channel, log_event, send_alert, send_log_summary
 from ..scraper import REGISTRY
@@ -61,7 +61,10 @@ class SchedulerManager:
 
     async def refresh_all(self) -> None:
         for guild in self.bot.guilds:
-            await self.refresh_guild(guild.id)
+            try:
+                await self.refresh_guild(guild.id)
+            except ConfigError:
+                logger.exception("Config invalide pour le serveur %s, ignoré", guild.id)
 
     async def refresh_guild(self, guild_id: int) -> None:
         config = self.bot.config_store.load(guild_id)
@@ -88,7 +91,7 @@ class SchedulerManager:
             if g == guild_id and site not in site_intervals:
                 self._site_tasks.pop(key).cancel()
 
-        has_log_channel = config.channel_id(ChannelRole.LOG) is not None
+        has_log_channel = config.log_channel_id is not None
         log_task = self._log_tasks.get(guild_id)
         if has_log_channel and (log_task is None or log_task.done()):
             self._log_tasks[guild_id] = asyncio.create_task(self._log_loop(guild_id))
@@ -106,7 +109,16 @@ class SchedulerManager:
         adapter = REGISTRY[site]
 
         while True:
-            config = self.bot.config_store.load(guild_id)
+            try:
+                config = self.bot.config_store.load(guild_id)
+            except ConfigError:
+                # Config corrompue (édition manuelle ratée, etc.) : on retente au
+                # prochain cycle plutôt que de tuer la tâche silencieusement pour
+                # toujours (elle ne serait relancée qu'au prochain /filtre add|remove).
+                logger.exception("Config invalide pour le serveur %s, nouvelle tentative dans 1 min", guild_id)
+                await asyncio.sleep(_HARD_FLOOR_SECONDS)
+                continue
+
             profiles = [p for p in config.profiles if site in p.sites]
             if not profiles:
                 return  # plus aucun profil ne cible ce site : la tâche s'arrête
@@ -211,9 +223,14 @@ class SchedulerManager:
     async def _log_loop(self, guild_id: int) -> None:
         last_check = _now_iso()
         while True:
-            config = self.bot.config_store.load(guild_id)
-            log_channel_id = config.channel_id(ChannelRole.LOG)
-            if log_channel_id is None:
+            try:
+                config = self.bot.config_store.load(guild_id)
+            except ConfigError:
+                logger.exception("Config invalide pour le serveur %s, nouvelle tentative dans 1 min", guild_id)
+                await asyncio.sleep(_HARD_FLOOR_SECONDS)
+                continue
+
+            if config.log_channel_id is None:
                 return  # plus de salon log configuré : la tâche s'arrête
 
             delay = max(_HARD_FLOOR_SECONDS, _jitter(config.log_interval_minutes * 60))

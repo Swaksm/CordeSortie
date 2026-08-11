@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from .config import ChannelRole, FilterProfile
+from .config import FilterProfile
 from .scraper import Item
 
 if TYPE_CHECKING:
@@ -60,10 +60,9 @@ async def send_alert(guild: discord.Guild, profile: FilterProfile, item: Item) -
 
 async def get_log_channel(bot: CordeSortieBot, guild: discord.Guild) -> discord.TextChannel | None:
     config = bot.config_store.load(guild.id)
-    channel_id = config.channel_id(ChannelRole.LOG)
-    if channel_id is None:
+    if config.log_channel_id is None:
         return None
-    channel = guild.get_channel(channel_id)
+    channel = guild.get_channel(config.log_channel_id)
     return channel if isinstance(channel, discord.TextChannel) else None
 
 

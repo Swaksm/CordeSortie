@@ -31,11 +31,12 @@ def format_profile_details(
 ) -> str:
     dispo = "disponible uniquement" if profile.only_available else "avec rupture (aussi)"
     bounds_str = _bounds_str(profile)
+    prix_str = bounds_str.strip(" ()") if bounds_str else "aucune limite"
     return (
         f"**Profil de filtre : {profile.name}**\n"
         f"- Sites surveillés : {', '.join(profile.sites)}\n"
         f"- Expression : `{profile.filter_expression}`\n"
-        f"- Filtres prix{bounds_str if bounds_str else ' : aucun'}\n"
+        f"- Prix : {prix_str}\n"
         f"- Disponibilité : {dispo}\n"
         f"- Intervalle de scrape : {profile.scrape_interval_minutes} min\n"
         f"- Créé par {creator_mention} le {created_at_str}"

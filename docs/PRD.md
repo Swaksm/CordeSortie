@@ -2,10 +2,11 @@
 
 ## 1. Objectif
 
-Un bot Discord hébergé sur Railway ou Render (plan payant si nécessaire) qui surveille
-en continu des sites marchands français à la recherche d'items Pokémon (cartes,
-coffrets, produits dérivés...) correspondant à des critères définis par l'utilisateur,
-et notifie sur Discord dès qu'un item disponible matche ces critères.
+Un bot Discord (en local pour l'instant, déploiement cloud reporté — voir
+[TASKS.md Phase 8](TASKS.md)) qui surveille en continu des sites marchands français à
+la recherche d'items Pokémon (cartes, coffrets, produits dérivés...) correspondant à
+des critères définis par l'utilisateur, et notifie sur Discord dès qu'un item
+disponible matche ces critères.
 
 Usage strictement personnel/privé : un seul serveur Discord, pas d'exposition publique.
 
@@ -44,16 +45,23 @@ plusieurs profils.
 
 ### 3.2 Salons Discord
 
-Trois rôles de salon, configurables (un salon Discord = un rôle, assignable via commande) :
+Salons auto-gérés par le bot, répartis en deux catégories Discord :
 
-- **Salon config** : lecture/écriture de la configuration (liste des filtres actifs,
-  sites, intervalle de scrape). Reflète l'état du fichier de config lisible.
-- **Salon alerte** : un message par item matché, avec titre, prix, site, lien direct,
-  et si possible une image.
-- **Salon log** : toutes les *N* minutes (configurable), un récapitulatif : nombre de
-  scrapes effectués, nombre d'items vus, nombre de matchs, erreurs éventuelles
-  (site down, adapter cassé, etc.). Sert à vérifier que le bot est vivant sans avoir à
-  lire les logs serveur.
+**Catégorie "Alertes"** :
+- Un **salon par profil de filtre**, auto-créé à la création du profil (`<pseudo>-<nom
+  du filtre>`), auto-supprimé avec lui. Un message par item matché (embed : titre,
+  prix, site, lien, image), plus un message épinglé récapitulant les critères du
+  profil. Évite que les alertes de plusieurs filtres se mélangent.
+
+**Catégorie "CordeSortie"** (pilotage du bot) :
+- **Salon info** (`📊-info-N-filtres`) : tableau de bord, renommé avec le nombre de
+  filtres actifs, message épinglé listant tous les profils.
+- **Salon aide** (`cordesortie-aide`) : documentation de toutes les commandes,
+  générée depuis le code (jamais désynchronisée), régénérée à chaque connexion.
+- **Salon log** (assigné via `/config set-log-channel`, un seul, pas auto-créé) :
+  flux en direct (création/suppression de filtre, résultat de chaque cycle de
+  scrape) **et** un récapitulatif périodique toutes les *N* minutes (configurable).
+  Sert à vérifier que le bot est vivant sans lire les logs serveur.
 
 ### 3.3 Sites supportés
 

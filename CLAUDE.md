@@ -27,10 +27,10 @@ en rupture / une bonne affaire toi-même".
   les commandes sont une couche UX au-dessus.
 - **Scheduler** : boucle asyncio interne avec délai *jitteré* (jamais un intervalle fixe)
   et plancher dur à 60s pour éviter le ban antibot.
-- **Hébergement** : Railway ou Render, plan payant si nécessaire (usage strictement
-  personnel/privé, un seul serveur Discord). Filesystem éphémère sur ces plateformes →
-  config JSON et DB SQLite doivent vivre sur un volume persistant, pas sur le disque
-  du conteneur. Voir [docs/ARCHITECTURE.md §6](docs/ARCHITECTURE.md#6-hébergement-railway--render).
+- **Hébergement** : en local pour l'instant, déploiement cloud reporté (Render/Railway
+  payants, Oracle Cloud Always Free bloqué par une saturation de capacité au moment de
+  l'essai — voir [docs/TASKS.md](docs/TASKS.md) Phase 8). `Dockerfile` prêt et testé
+  quelle que soit la plateforme retenue in fine.
 
 ## Documents de cadrage
 
@@ -49,9 +49,12 @@ d'avancement, pas la mémoire de la conversation.
 
 ## Conventions de travail
 
-- Un **adapter par site** (`sites/auchan.py`, `sites/leclerc.py`, ...) implémentant une
-  interface commune (`fetch_items() -> list[Item]`). Ne jamais mettre de logique
-  site-spécifique ailleurs que dans son adapter.
+- Un **adapter par site** (`cordesortie/scraper/adapters/<site>.py`) implémentant
+  l'interface `SiteAdapter` (`fetch_items(page) -> list[Item]`). Ne jamais mettre de
+  logique site-spécifique ailleurs que dans son adapter. Sélecteurs relevés
+  manuellement sur le site réel (voir docstring de chaque adapter pour la date) —
+  jamais devinés. Un site protégé par CAPTCHA (Fnac/Datadome) reste sans adapter :
+  contourner un CAPTCHA n'est pas fait ici.
 - Le **moteur de filtres** est générique et ne connaît aucun site : il reçoit des `Item`
   normalisés (titre, prix, dispo, url, site) et évalue une expression de filtre
   (AND/OR sur des `contains`) fournie par l'utilisateur.
@@ -64,7 +67,7 @@ d'avancement, pas la mémoire de la conversation.
   justifier dans le PR/commit — pas de gaspillage évident (ex : relancer un navigateur
   entier alors qu'un contexte réutilisé suffit).
 
-## Commandes utiles (à compléter au fur et à mesure du setup)
+## Commandes utiles
 
 ```bash
 # Installation
@@ -73,9 +76,14 @@ playwright install chromium
 
 # Lancer le bot
 python -m cordesortie
+
+# Tests
+pip install -r requirements-dev.txt
+pytest
 ```
 
 ## État du projet
 
-Projet en phase de cadrage (pas encore de code). Voir [docs/TASKS.md](docs/TASKS.md)
-pour la roadmap.
+Fonctionnel, testé en usage réel (scraping, filtres, alertes, dédup, scheduler, arrêt
+propre). Voir [docs/TASKS.md](docs/TASKS.md) pour l'état détaillé par phase — c'est la
+source de vérité, pas ce fichier.

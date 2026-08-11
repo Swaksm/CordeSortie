@@ -1,14 +1,12 @@
 from .models import (
     DEFAULT_SCRAPE_INTERVAL_MINUTES,
     MIN_SCRAPE_INTERVAL_MINUTES,
-    ChannelRole,
     FilterProfile,
     GuildConfig,
 )
 from .store import ConfigStore
 
 __all__ = [
-    "ChannelRole",
     "FilterProfile",
     "GuildConfig",
     "ConfigStore",
