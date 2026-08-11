@@ -16,15 +16,21 @@ en rupture / une bonne affaire toi-même".
 
 - **Langage** : Python 3.12+
 - **Bot Discord** : `discord.py` (slash commands)
-- **Scraping** : Playwright (navigateur headless) pour tous les sites — nécessaire face
-  aux antibots type Cloudflare/Datadome présents sur la plupart des enseignes visées.
-  Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour la discussion coût/perf.
-- **Stockage** : SQLite (fichier local, via `sqlite3`/`sqlalchemy` ou `aiosqlite`)
+- **Scraping** : Playwright (navigateur headless) pour **tous** les sites, sans
+  fallback HTTP — nécessaire face aux antibots type Cloudflare/Datadome présents sur
+  la plupart des enseignes visées. Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+  pour la discussion coût/perf.
+- **Stockage** : SQLite (fichier local, via `sqlite3`/`sqlalchemy` ou `aiosqlite`), sur
+  un volume persistant en prod (voir hébergement ci-dessous).
 - **Config utilisateur** : double interface — commandes slash Discord qui lisent/écrivent
   un fichier de config lisible (JSON) par serveur. Le fichier reste la source de vérité,
   les commandes sont une couche UX au-dessus.
 - **Scheduler** : boucle asyncio interne avec délai *jitteré* (jamais un intervalle fixe)
   et plancher dur à 60s pour éviter le ban antibot.
+- **Hébergement** : Railway ou Render, plan payant si nécessaire (usage strictement
+  personnel/privé, un seul serveur Discord). Filesystem éphémère sur ces plateformes →
+  config JSON et DB SQLite doivent vivre sur un volume persistant, pas sur le disque
+  du conteneur. Voir [docs/ARCHITECTURE.md §6](docs/ARCHITECTURE.md#6-hébergement-railway--render).
 
 ## Documents de cadrage
 
@@ -53,8 +59,10 @@ d'avancement, pas la mémoire de la conversation.
   direct à un site depuis un adapter en dehors du scheduler.
 - Ne jamais committer de secrets (token Discord, cookies de session) : `.env` est
   gitignore, utiliser `.env.example` comme référence.
-- Pas de dépendances lourdes non justifiées : l'objectif annoncé est un outil **léger et
-  performant**. Toute nouvelle dépendance doit se justifier dans le PR/commit.
+- Pas de dépendances non justifiées : le budget CPU/RAM n'est pas la contrainte
+  principale (hébergement payant), mais toute nouvelle dépendance doit quand même se
+  justifier dans le PR/commit — pas de gaspillage évident (ex : relancer un navigateur
+  entier alors qu'un contexte réutilisé suffit).
 
 ## Commandes utiles (à compléter au fur et à mesure du setup)
 

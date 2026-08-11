@@ -18,17 +18,23 @@ bloquant pour un usage personnel/petit groupe, mais :
 Ce projet est cadré comme un outil de veille personnelle, pas un outil de sniping/achat
 automatique — voir le "Hors périmètre" du [PRD](PRD.md). Le garder ainsi.
 
-## 2. Playwright partout = tension avec "léger et performant"
+## 2. Playwright partout = coût CPU/RAM, hébergement payant assumé
 
-Le choix (validé) d'utiliser Playwright sur tous les sites est le plus robuste face à
-l'antibot, mais c'est objectivement le choix le plus lourd en CPU/RAM parmi les options
-possibles. Pistes pour limiter l'impact :
+Décision : pas de fallback HTTP par site, Playwright partout pour tous les sites, sans
+exception — priorité à la robustesse anti-détection sur la légèreté. L'objectif n'est
+plus "léger" mais "pas inutilement lourd" : hébergement prévu sur Railway ou Render
+(payant), donc du budget CPU/RAM est disponible.
+
+Reste important malgré tout :
 - Réutiliser un même contexte navigateur entre cycles au lieu de relancer Chromium à
-  chaque scrape (déjà noté dans ARCHITECTURE.md — c'est important, pas optionnel).
-- Si un site s'avère ne pas avoir d'antibot après test réel, envisager de repasser cet
-  adapter en HTTP simple (httpx) pour lui — l'interface `SiteAdapter` le permet sans
-  changer le reste du système.
-- Surveiller la RAM réelle en usage prolongé avant de multiplier les sites actifs.
+  chaque scrape (noté dans ARCHITECTURE.md) — ça reste la principale source d'économie
+  et évite de payer pour rien, indépendamment du budget disponible.
+- Surveiller la RAM réelle en usage prolongé pour dimensionner le plan Railway/Render
+  (les plans hobby ont des limites de RAM assez basses — un navigateur headless par
+  site actif en simultané peut dépasser un plan gratuit/starter rapidement).
+- Railway/Render : vérifier que l'image de déploiement peut installer les dépendances
+  système de Chromium (`playwright install --with-deps`) — c'est souvent le point de
+  friction n°1 pour déployer Playwright sur ces plateformes (buildpack vs Docker).
 
 ## 3. Grammaire de filtre en texte libre = risque d'ambiguïté
 
@@ -70,10 +76,20 @@ erreur/backoff) — jamais de crash global à cause d'un site qui a changé sa p
   qui aurait matché), pratique pour valider un nouvel adapter ou un nouveau filtre sans
   spammer le salon alerte.
 
-## 7. Questions encore ouvertes (à trancher avant/pendant l'implémentation)
+## 7. Questions tranchées
 
-- Un seul serveur Discord au départ (assumé dans le PRD) — confirmé ?
-- Le bot doit-il être hébergé en continu (VPS/Raspberry Pi maison) ? Ça conditionne le
-  budget RAM/CPU réellement disponible pour Playwright.
+- Usage strictement personnel/privé, un seul serveur Discord, pas d'exposition
+  publique — confirmé.
+- Hébergement : Railway ou Render, payant si nécessaire — donc pas de contrainte dure
+  de budget RAM/CPU, juste éviter le gaspillage évident (voir §2).
+
+## 8. Questions encore ouvertes (à trancher avant/pendant l'implémentation)
+
+- Railway ou Render — lequel des deux, et déploiement via Dockerfile (recommandé pour
+  maîtriser l'install de Chromium) ou buildpack natif ?
 - Faut-il une commande d'urgence `/pause` qui coupe tout scraping immédiatement (utile
   si un site commence visiblement à bloquer/CAPTCHA en boucle) ?
+- Le stockage SQLite + fichiers config JSON doit vivre sur un volume persistant côté
+  Railway/Render (ces plateformes ont un filesystem éphémère par défaut sur les plans
+  standards) — à vérifier/configurer avant la mise en prod, sinon la config et
+  l'historique de dédup repartent de zéro à chaque redeploy.

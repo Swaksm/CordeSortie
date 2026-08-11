@@ -2,22 +2,26 @@
 
 ## 1. Objectif
 
-Un bot Discord auto-hébergé qui surveille en continu des sites marchands français à la
-recherche d'items Pokémon (cartes, coffrets, produits dérivés...) correspondant à des
-critères définis par l'utilisateur, et notifie sur Discord dès qu'un item disponible
-matche ces critères.
+Un bot Discord hébergé sur Railway ou Render (plan payant si nécessaire) qui surveille
+en continu des sites marchands français à la recherche d'items Pokémon (cartes,
+coffrets, produits dérivés...) correspondant à des critères définis par l'utilisateur,
+et notifie sur Discord dès qu'un item disponible matche ces critères.
+
+Usage strictement personnel/privé : un seul serveur Discord, pas d'exposition publique.
 
 Priorités du projet, par ordre :
 1. **Fiable** — ne pas rater une alerte, ne pas spammer de faux positifs.
 2. **Discret** — ne jamais se faire bloquer par les antibots des sites cibles.
 3. **Simple/intuitif** — un utilisateur non technique doit pouvoir configurer ses
    filtres sans toucher à du code.
-4. **Léger** — pas de sur-ingénierie, empreinte CPU/RAM raisonnable.
+4. **Pas inutilement lourd** — pas de sur-ingénierie ; le budget CPU/RAM n'est pas la
+   contrainte principale (hébergement payant assumé), mais on évite le gaspillage
+   évident (ex : relancer un navigateur entier à chaque cycle de scrape).
 
 ## 2. Utilisateurs cibles
 
-Un serveur Discord (potentiellement plusieurs à terme, mais le MVP vise **un serveur**),
-avec un ou plusieurs utilisateurs qui définissent des filtres et reçoivent les alertes.
+Un seul serveur Discord privé, avec un ou plusieurs utilisateurs qui définissent des
+filtres et reçoivent les alertes. Pas de multi-serveur au MVP (voir backlog v2).
 
 ## 3. Fonctionnalités
 

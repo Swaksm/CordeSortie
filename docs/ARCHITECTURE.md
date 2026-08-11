@@ -61,10 +61,12 @@
   dans le salon log au lieu de retry en boucle serrée.
 
 ### 2.4 Scraper engine (`scraper/`)
-- Playwright (Chromium headless) pour tous les sites au départ, avec réutilisation
-  d'un contexte de navigateur persistant (cookies, éventuel fingerprint stable) plutôt
-  que de relancer un navigateur à chaque cycle — c'est ce qui garde l'ensemble
-  "léger" malgré Playwright.
+- Playwright (Chromium headless) pour **tous** les sites, sans exception ni fallback
+  HTTP — priorité donnée à la robustesse anti-détection sur la légèreté (hébergement
+  payant assumé, voir §6).
+- Réutilisation d'un contexte de navigateur persistant (cookies, éventuel fingerprint
+  stable) entre cycles plutôt que de relancer un navigateur à chaque scrape — ça reste
+  la principale optimisation à ne pas sauter, indépendamment du budget disponible.
 - Interface commune par adapter :
   ```python
   class SiteAdapter(Protocol):
@@ -137,3 +139,18 @@ Contraintes non négociables :
   isoler les cookies/fingerprints ?
 - Format exact de la grammaire de filtre (texte libre à parser vs commandes Discord
   structurées type builder) — voir discussion UX dans [RISKS.md](RISKS.md).
+
+## 6. Hébergement (Railway / Render)
+
+- Déploiement prévu sur Railway ou Render, plan payant si nécessaire pour tenir la
+  charge Playwright — voir [RISKS.md](RISKS.md) §2 pour les compromis CPU/RAM.
+- **Dockerfile recommandé** plutôt qu'un buildpack natif, pour maîtriser précisément
+  l'installation des dépendances système de Chromium
+  (`playwright install --with-deps chromium`) — c'est le point de friction le plus
+  courant sur ces plateformes.
+- **Filesystem éphémère** : Railway/Render ne garantissent pas la persistance du disque
+  entre redeploys sur les plans standards. La config JSON par serveur et la DB SQLite
+  (dédup des items vus) doivent vivre sur un **volume persistant** explicitement monté
+  (Railway Volumes / Render Disks), sinon un redeploy efface l'historique et la config.
+- Variables sensibles (token Discord) via les variables d'environnement de la
+  plateforme, jamais commitées — cohérent avec `.env` gitignoré en local.
