@@ -98,21 +98,34 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 ## Phase 7 — Durcissement / qualité
 
-- [ ] Tests sur le moteur de filtres (cas AND/OR/NOT imbriqués)
-- [ ] Tests sur le scheduler (jitter respecte le plancher, backoff fonctionne)
-- [ ] Gestion propre de l'arrêt (SIGINT/SIGTERM) — fermer proprement Playwright
+- [x] Tests sur le moteur de filtres (cas AND/OR/NOT imbriqués) — `tests/test_filters.py`
+- [x] Tests sur le scheduler (jitter respecte le plancher, backoff fonctionne,
+      plafonne) — `tests/test_scheduler.py`, logique de délai extraite dans
+      `_compute_delay_seconds()` pour être testable sans event loop réel
+- [x] Gestion propre de l'arrêt : `bot.close()` vérifié — ferme la DB, arrête
+      Playwright (aucun process Chromium orphelin), annule les tâches du
+      scheduler (`tests/test_bot_lifecycle.py`). Découvert au passage : mes
+      propres redémarrages de test laissaient tourner plusieurs instances du
+      bot en parallèle (outil de gestion de process, pas un bug du bot) —
+      nettoyé, à surveiller en usage réel.
 - [ ] Revue anti-détection avant mise en prod longue durée (voir RISKS.md)
 - [ ] Documentation utilisateur finale (README : comment inviter le bot, premiers pas)
 
-## Phase 8 — Déploiement Render
+## Phase 8 — Déploiement (reporté)
 
-- [x] `Dockerfile` (build + import testés en local avec Docker)
-- [x] Repo GitHub créé et code poussé (nécessaire pour connecter Render)
-- [x] `playwright install --with-deps chromium` dans le Dockerfile, scraper Carrefour
-      testé et fonctionnel à l'intérieur du conteneur
-- [ ] Service Render "Background Worker" créé, connecté au repo
-- [ ] `DISCORD_TOKEN` configuré en variable d'environnement Render (jamais commité)
-- [ ] Render Disk monté sur `/data` (doit matcher `DATA_DIR=/data` du Dockerfile)
+Décision (2026-08-12) : déploiement mis en pause, priorité à fiabiliser le bot en
+local d'abord. Aucune option gratuite pérenne trouvée pour un Background Worker +
+disque persistant : Render (aucun tier gratuit pour ça), Railway (trial épuisé,
+passage payant nécessaire), Oracle Cloud Always Free (vrai gratuit à vie, mais
+capacité ARM saturée au moment de l'essai — à retenter plus tard). Le `Dockerfile`
+est prêt et testé, indépendant de la plateforme choisie in fine.
+
+- [x] `Dockerfile` (build + import testés en local avec Docker, y compris Playwright)
+- [x] Repo GitHub créé et code poussé (nécessaire pour connecter n'importe quelle
+      plateforme de déploiement)
+- [ ] Choisir la plateforme définitive (Render / Railway / Oracle Cloud / auto-hébergé)
+- [ ] Service créé, connecté au repo, `DISCORD_TOKEN` en variable d'environnement
+- [ ] Volume/disque persistant monté sur `/data`
 
 ## Backlog / v2 (hors MVP)
 

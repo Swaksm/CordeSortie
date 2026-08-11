@@ -39,6 +39,20 @@ def _jitter(base_seconds: float, spread: float = 0.15) -> float:
     return base_seconds * random.uniform(1 - spread, 1 + spread)
 
 
+def _compute_delay_seconds(
+    interval_minutes: int, *, error: bool, consecutive_errors: int
+) -> float:
+    """Délai avant le prochain cycle. Le plancher dur s'applique dans TOUS les cas,
+    y compris en backoff — sans ce `max()`, un backoff sur un intervalle très court
+    (ex. 1 min) pourrait redescendre sous 60s une fois le jitter appliqué."""
+    if error:
+        backoff_minutes = min(
+            interval_minutes * (2 ** min(consecutive_errors, 5)), _MAX_BACKOFF_MINUTES
+        )
+        return max(_HARD_FLOOR_SECONDS, _jitter(backoff_minutes * 60))
+    return max(_HARD_FLOOR_SECONDS, _jitter(interval_minutes * 60))
+
+
 class SchedulerManager:
     def __init__(self, bot: CordeSortieBot) -> None:
         self.bot = bot
@@ -189,14 +203,9 @@ class SchedulerManager:
                     f"🔍 **{site}** : {len(items)} item(s), {matched_total} match(s)",
                 )
 
-            if error is not None:
-                backoff_minutes = min(
-                    interval_minutes * (2 ** min(consecutive_errors, 5)), _MAX_BACKOFF_MINUTES
-                )
-                delay = _jitter(backoff_minutes * 60)
-            else:
-                delay = max(_HARD_FLOOR_SECONDS, _jitter(interval_minutes * 60))
-
+            delay = _compute_delay_seconds(
+                interval_minutes, error=error is not None, consecutive_errors=consecutive_errors
+            )
             await asyncio.sleep(delay)
 
     async def _log_loop(self, guild_id: int) -> None:
