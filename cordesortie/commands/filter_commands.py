@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import discord
@@ -7,13 +9,17 @@ from discord import app_commands
 from discord.ext import commands
 from pydantic import ValidationError
 
-from ..config import FilterProfile
+from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..sites import SUPPORTED_SITES
 from .alert_channels import create_alert_channel, delete_alert_channel
+from .formatting import format_profile_details, format_profile_line
+from .info_channel import update_info_channel
 
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
+
+logger = logging.getLogger("cordesortie")
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -36,6 +42,10 @@ class FilterCog(commands.Cog):
         price_min="Prix minimum (optionnel)",
         price_max="Prix maximum (optionnel)",
         only_available="N'alerter que si l'item est disponible (par défaut : oui)",
+        interval_minutes=(
+            f"Intervalle de scrape en minutes (défaut : {DEFAULT_SCRAPE_INTERVAL_MINUTES}, "
+            "minimum 1)"
+        ),
     )
     @app_commands.default_permissions(manage_guild=True)
     async def add(
@@ -47,7 +57,10 @@ class FilterCog(commands.Cog):
         price_min: float | None = None,
         price_max: float | None = None,
         only_available: bool = True,
+        interval_minutes: int | None = None,
     ) -> None:
+        interval = interval_minutes if interval_minutes is not None else DEFAULT_SCRAPE_INTERVAL_MINUTES
+
         if interaction.guild_id is None or interaction.guild is None:
             await interaction.response.send_message(
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
@@ -75,6 +88,7 @@ class FilterCog(commands.Cog):
                 sites=site_list,
                 filter_expression=expression,
                 alert_channel_id=0,
+                scrape_interval_minutes=interval,
                 price_min=price_min,
                 price_max=price_max,
                 only_available=only_available,
@@ -110,12 +124,28 @@ class FilterCog(commands.Cog):
             sites=site_list,
             filter_expression=expression,
             alert_channel_id=channel.id,
+            scrape_interval_minutes=interval,
             price_min=price_min,
             price_max=price_max,
             only_available=only_available,
         )
         config.profiles.append(profile)
         store.save(interaction.guild_id, config)
+
+        created_at_str = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
+        details = format_profile_details(
+            profile, creator_mention=interaction.user.mention, created_at_str=created_at_str
+        )
+        try:
+            info_message = await channel.send(details)
+            await info_message.pin()
+        except discord.HTTPException:
+            logger.warning("Message/épinglage impossible dans le salon %s", channel.id)
+
+        try:
+            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+        except discord.HTTPException:
+            logger.warning("Mise à jour du salon info impossible")
 
         await interaction.followup.send(
             f"Profil **{name}** créé sur {', '.join(site_list)}. "
@@ -156,6 +186,11 @@ class FilterCog(commands.Cog):
         except discord.HTTPException:
             note = " (erreur lors de la suppression du salon)"
 
+        try:
+            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+        except discord.HTTPException:
+            logger.warning("Mise à jour du salon info impossible")
+
         await interaction.response.send_message(
             f"Profil **{name}** supprimé.{note}", ephemeral=True
         )
@@ -179,19 +214,7 @@ class FilterCog(commands.Cog):
             return
 
         lines = ["**Profils de filtre**"]
-        for profile in config.profiles:
-            bounds = []
-            if profile.price_min is not None:
-                bounds.append(f"prix >= {profile.price_min}")
-            if profile.price_max is not None:
-                bounds.append(f"prix <= {profile.price_max}")
-            bounds_str = f" ({', '.join(bounds)})" if bounds else ""
-            dispo = "disponible uniquement" if profile.only_available else "avec rupture"
-            lines.append(
-                f"- **{profile.name}** — sites: {', '.join(profile.sites)} — "
-                f"`{profile.filter_expression}`{bounds_str} — {dispo} — "
-                f"<#{profile.alert_channel_id}>"
-            )
+        lines.extend(format_profile_line(profile) for profile in config.profiles)
 
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 

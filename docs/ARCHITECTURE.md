@@ -134,7 +134,12 @@ Contraintes non négociables :
 
 ## 5. Points ouverts à trancher en implémentation
 
-- Faut-il un intervalle de scrape par site ou par profil ? (impacte le scheduler)
+- ~~Faut-il un intervalle de scrape par site ou par profil ?~~ **Tranché : par profil**
+  (`FilterProfile.scrape_interval_minutes`, défaut 5 min, plancher dur 1 min validé au
+  niveau du modèle). Le scheduler (Phase 5) doit donc gérer un intervalle par profil,
+  pas par site — un même site peut être scrapé à des rythmes différents selon les
+  profils qui le ciblent (à dédupliquer intelligemment : pas la peine de scraper deux
+  fois le même site en parallèle pour deux profils, cf. implémentation du scheduler).
 - Réutiliser un seul navigateur Playwright partagé entre sites, ou un par site pour
   isoler les cookies/fingerprints ?
 - Format exact de la grammaire de filtre (texte libre à parser vs commandes Discord
