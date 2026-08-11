@@ -12,9 +12,13 @@ from pydantic import ValidationError
 from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..sites import SUPPORTED_SITES
+from ..scraper import REGISTRY, BrowserManager
 from .alert_channels import create_alert_channel, delete_alert_channel
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
+
+_DRY_RUN_MAX_ITEMS_PER_SITE = 5
+_DISCORD_MESSAGE_LIMIT = 1900
 
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
@@ -244,3 +248,79 @@ class FilterCog(commands.Cog):
 
         verdict = "✅ Match" if result else "❌ Pas de match"
         await interaction.response.send_message(verdict, ephemeral=True)
+
+    @filtre_group.command(
+        name="dry-run",
+        description="Scraper en direct les sites d'un profil et voir ce qui matche (sans alerter)",
+    )
+    @app_commands.describe(name="Nom du profil à tester")
+    async def dry_run(self, interaction: discord.Interaction, name: str) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "Cette commande doit être utilisée dans un serveur.", ephemeral=True
+            )
+            return
+
+        store = self.bot.config_store
+        config = store.load(interaction.guild_id)
+        profile = config.get_profile(name)
+
+        if profile is None:
+            await interaction.response.send_message(
+                f"Aucun profil nommé **{name}**.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        node = parse_filter(profile.filter_expression)
+        lines: list[str] = []
+        total_matches = 0
+
+        async with BrowserManager() as bm:
+            for site in profile.sites:
+                adapter = REGISTRY.get(site)
+                if adapter is None:
+                    lines.append(f"- **{site}** : adapter pas encore disponible")
+                    continue
+
+                try:
+                    page = await bm.new_page()
+                    try:
+                        items = await adapter.fetch_items(page)
+                    finally:
+                        await page.close()
+                except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
+                    logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
+                    lines.append(f"- **{site}** : erreur de scrape ({exc})")
+                    continue
+
+                matches = [
+                    item
+                    for item in items
+                    if matches_item(
+                        node,
+                        text=item.text,
+                        price=item.price,
+                        available=item.available,
+                        price_min=profile.price_min,
+                        price_max=profile.price_max,
+                        only_available=profile.only_available,
+                    )
+                ]
+                total_matches += len(matches)
+                lines.append(
+                    f"- **{site}** : {len(items)} item(s) scrapé(s), {len(matches)} match(s)"
+                )
+                for item in matches[:_DRY_RUN_MAX_ITEMS_PER_SITE]:
+                    price_str = f"{item.price} €" if item.price is not None else "prix inconnu"
+                    lines.append(f"  - {item.title} — {price_str} — <{item.url}>")
+                if len(matches) > _DRY_RUN_MAX_ITEMS_PER_SITE:
+                    lines.append(
+                        f"  - … et {len(matches) - _DRY_RUN_MAX_ITEMS_PER_SITE} de plus"
+                    )
+
+        header = f"**Dry-run : {profile.name}** — {total_matches} match(s) au total\n"
+        body = "\n".join(lines)
+        message = (header + body)[:_DISCORD_MESSAGE_LIMIT]
+        await interaction.followup.send(message, ephemeral=True)

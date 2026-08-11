@@ -43,6 +43,10 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [x] Normalisation `Item` (titre, prix, dispo, url, image)
 - [x] Adapter JouéClub (hors plan initial, ajouté car dispo web fiable) — testé en
       direct, 26 items dont 6 correctement détectés indisponibles
+- [x] Commande `/filtre dry-run` (hors plan initial) : scrape en direct les sites
+      d'un profil et applique le moteur de filtres dessus, sans alerter ni toucher
+      à la dédup — pont manuel entre scraper et filtres en attendant le scheduler
+      (Phase 5). Testé bout en bout : 30 matchs corrects sur carrefour + joueclub.
 - [ ] Adapters Auchan, Leclerc, Fnac
 
 ## Phase 5 — Scheduler & anti-détection
