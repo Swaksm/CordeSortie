@@ -65,6 +65,16 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [ ] Revue anti-détection avant mise en prod longue durée (voir RISKS.md)
 - [ ] Documentation utilisateur finale (README : comment inviter le bot, premiers pas)
 
+## Phase 8 — Déploiement Render
+
+- [x] `Dockerfile` (build + import testés en local avec Docker)
+- [ ] Repo GitHub créé et code poussé (nécessaire pour connecter Render)
+- [ ] Service Render "Background Worker" créé, connecté au repo
+- [ ] `DISCORD_TOKEN` configuré en variable d'environnement Render (jamais commité)
+- [ ] Render Disk monté sur `/data` (doit matcher `DATA_DIR=/data` du Dockerfile)
+- [ ] Mettre à jour le Dockerfile avec `playwright install --with-deps chromium`
+      une fois la Phase 4 (scraper) codée
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées
