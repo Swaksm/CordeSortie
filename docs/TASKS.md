@@ -47,7 +47,13 @@ c'est la référence pour savoir où on en est, pas la conversation.
       d'un profil et applique le moteur de filtres dessus, sans alerter ni toucher
       à la dédup — pont manuel entre scraper et filtres en attendant le scheduler
       (Phase 5). Testé bout en bout : 30 matchs corrects sur carrefour + joueclub.
-- [ ] Adapters Auchan, Leclerc, Fnac
+- [x] Adapter Leclerc — testé en direct, 42 items, prix corrects (pas de vraie
+      détection de rupture, comme Carrefour)
+- [x] Adapter Auchan — testé en direct, 30 items, 17 dispo/13 rupture correctement
+      détectés via microdonnées schema.org (`meta[itemprop=availability]`)
+- [x] ~~Adapter Fnac~~ **abandonné** : bloqué par un CAPTCHA Datadome dès la
+      première requête (voir docs/SITES.md) — pas d'adapter, contourner un CAPTCHA
+      n'est pas fait ici
 
 ## Phase 5 — Scheduler & anti-détection
 
