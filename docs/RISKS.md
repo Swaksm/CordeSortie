@@ -82,14 +82,19 @@ erreur/backoff) — jamais de crash global à cause d'un site qui a changé sa p
   publique — confirmé.
 - Hébergement : Railway ou Render, payant si nécessaire — donc pas de contrainte dure
   de budget RAM/CPU, juste éviter le gaspillage évident (voir §2).
+- Hébergement : **Render, type de service "Background Worker"** — adapté nativement à
+  un process sans serveur HTTP (contrairement à un service web classique, pas de
+  spin-down à contourner). Render Disks pour le volume persistant.
+- Déploiement via **Dockerfile** (pas de buildpack natif) — nécessaire pour maîtriser
+  l'installation des dépendances système de Chromium
+  (`playwright install --with-deps chromium`), point de friction connu des buildpacks
+  auto-détectés.
+- **Commande `/pause`** confirmée au scope : coupe immédiatement tout scraping (tous
+  sites), utile si un site commence visiblement à bloquer/CAPTCHA en boucle. Ajoutée à
+  TASKS.md phase 6.
 
 ## 8. Questions encore ouvertes (à trancher avant/pendant l'implémentation)
 
-- Railway ou Render — lequel des deux, et déploiement via Dockerfile (recommandé pour
-  maîtriser l'install de Chromium) ou buildpack natif ?
-- Faut-il une commande d'urgence `/pause` qui coupe tout scraping immédiatement (utile
-  si un site commence visiblement à bloquer/CAPTCHA en boucle) ?
-- Le stockage SQLite + fichiers config JSON doit vivre sur un volume persistant côté
-  Railway/Render (ces plateformes ont un filesystem éphémère par défaut sur les plans
-  standards) — à vérifier/configurer avant la mise en prod, sinon la config et
+- Le stockage SQLite + fichiers config JSON doit vivre sur un Render Disk monté sur un
+  chemin persistant — à configurer avant la mise en prod, sinon la config et
   l'historique de dédup repartent de zéro à chaque redeploy.

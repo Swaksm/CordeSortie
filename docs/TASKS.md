@@ -7,16 +7,16 @@ c'est la référence pour savoir où on en est, pas la conversation.
 
 - [x] Cadrage (PRD, architecture, liste de sites) — `docs/`
 - [x] Init git
-- [ ] Squelette Python (`pyproject.toml` ou `requirements.txt`, structure de dossiers)
-- [ ] `.env.example` (token Discord, chemins config)
+- [x] Squelette Python (`requirements.txt`, structure de dossiers)
+- [x] `.env.example` (token Discord, chemins config)
 - [ ] CI minimale (lint + un test qui importe le package) — optionnel mais utile tôt
 
 ## Phase 1 — Bot Discord de base
 
-- [ ] Connexion bot, enregistrement des slash commands (squelette vide)
-- [ ] Commande `/config set-channel <role: config|alerte|log> <#salon>`
-- [ ] Persistance de la config de base (channels) dans `data/<guild_id>/config.json`
-- [ ] Commande `/config show` (affiche la config actuelle dans le salon config)
+- [x] Connexion bot, enregistrement des slash commands (squelette vide)
+- [x] Commande `/config set-channel <role: config|alerte|log> <#salon>`
+- [x] Persistance de la config de base (channels) dans `data/<guild_id>/config.json`
+- [x] Commande `/config show` (affiche la config actuelle dans le salon config)
 
 ## Phase 2 — Stockage
 
@@ -55,6 +55,7 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [ ] Notification si prix change ou item redevient disponible
 - [ ] Log périodique (salon log), intervalle configurable indépendamment du scrape
 - [ ] Gestion des erreurs remontées dans le log (site down, adapter cassé)
+- [ ] Commande `/pause` : coupe immédiatement tout scraping (tous sites)
 
 ## Phase 7 — Durcissement / qualité
 
