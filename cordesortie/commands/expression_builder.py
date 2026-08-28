@@ -11,6 +11,10 @@ volontaire, le formulaire vise le cas courant, pas l'expressivité complète
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from ..filters import And, Contains, FilterSyntaxError, Not, Or, parse_filter
+
 
 class ExpressionBuilderError(Exception):
     """Aucun mot-clé exploitable fourni dans les champs du formulaire."""
@@ -53,3 +57,58 @@ def build_expression(*, must_all: str, any_of: str, exclude: str) -> str:
     parts.extend(f"NON {term}" for term in exclude_terms)
 
     return " ET ".join(parts)
+
+
+@dataclass(frozen=True, slots=True)
+class DecomposedExpression:
+    """Les 3 champs du formulaire, chacun prêt à être réaffiché tel quel (un
+    mot par ligne) — voir `decompose_expression`."""
+
+    must_all: str
+    any_of: str
+    exclude: str
+
+
+def decompose_expression(expression: str) -> DecomposedExpression | None:
+    """Tente de retrouver les 3 listes de mots-clés (must_all/any_of/exclude) à
+    partir d'une expression texte, pour pré-remplir le formulaire de
+    `/filtre edit` avec les conditions actuelles du profil plutôt que de
+    partir d'un formulaire vide.
+
+    Ne fonctionne que si l'expression a exactement la forme produite par
+    `build_expression()` (un ET de mots simples, au plus un OU groupé de mots,
+    des NON de mots simples) — une expression plus complexe (imbrication
+    arbitraire) ne peut pas être redécomposée fidèlement dans ces 3 champs.
+    Retourne `None` dans ce cas plutôt que de risquer de reconstruire un
+    filtre différent de l'original ; le formulaire s'ouvre alors vide.
+    """
+    try:
+        node = parse_filter(expression)
+    except FilterSyntaxError:
+        return None
+
+    terms = node.children if isinstance(node, And) else (node,)
+
+    must_all: list[str] = []
+    any_of: list[str] = []
+    exclude: list[str] = []
+    any_of_seen = False
+
+    for term in terms:
+        if isinstance(term, Contains):
+            must_all.append(term.text)
+        elif isinstance(term, Not) and isinstance(term.child, Contains):
+            exclude.append(term.child.text)
+        elif isinstance(term, Or):
+            if any_of_seen or not all(isinstance(child, Contains) for child in term.children):
+                return None
+            any_of_seen = True
+            any_of.extend(child.text for child in term.children)
+        else:
+            return None
+
+    return DecomposedExpression(
+        must_all="\n".join(must_all),
+        any_of="\n".join(any_of),
+        exclude="\n".join(exclude),
+    )

@@ -44,17 +44,19 @@ piège :
 Le bot combine tout ça automatiquement en une expression valide. Pas de
 guillemets, ET/OU/NON ou parenthèses à taper toi-même.
 
-**Pour aller plus loin** (`/filtre edit`, `/filtre test`) : ces commandes
-prennent une expression en texte libre, avec la même logique mais écrite à la
-main :
+`/filtre edit` fonctionne pareil, en pré-remplissant le menu et le formulaire
+avec les valeurs actuelles du profil : clique juste Continuer/Valider sans
+rien changer pour ne rien modifier, ou ajuste ce que tu veux changer.
+
+**Pour aller plus loin** (`/filtre test`, pour composer/valider une expression
+plus complexe à la main sans créer de profil) — même logique, écrite en
+texte libre :
 > `"pokemon"` → contient "pokemon"
 > `"pokemon" ET "coffret"` → doit contenir les deux
 > `("pokemon" OU "poke") ET ("30 ans" OU "30 years")` → parenthèses
 > obligatoires dès que tu mélanges ET et OU (sinon le bot refuse, pour éviter
 > toute ambiguïté)
-> `"pokemon" ET NON "peluche"` → exclut un mot
-
-Astuce : teste une expression sans créer de profil avec `/filtre test`."""
+> `"pokemon" ET NON "peluche"` → exclut un mot"""
 
 
 def _generate_command_blocks(bot: commands.Bot) -> list[str]:

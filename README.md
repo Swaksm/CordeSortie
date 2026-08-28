@@ -14,19 +14,22 @@ phase.
 
 ## Fonctionnalités
 
-- **Création de filtre guidée** (`/filtre add`) : menu à cocher pour les sites, puis un
-  formulaire ("doit contenir tous ces mots" / "au moins un de ces mots" / "ne doit pas
-  contenir") — le bot compose l'expression texte automatiquement, rien à taper à la
-  main. Recherche insensible à la casse et aux accents ("pokemon" = "Pokémon").
-  L'expression texte reste éditable à la main (`ET`/`OU`/`NON`, parenthèses) via
-  `/filtre edit` et testable via `/filtre test` pour les cas avancés. Modifiable après
-  coup (`/filtre edit`) sans supprimer/recréer.
+- **Création et modification de filtre guidées** (`/filtre add`, `/filtre edit`) : menu
+  à cocher pour les sites, puis un formulaire ("doit contenir tous ces mots" / "au
+  moins un de ces mots" / "ne doit pas contenir") — le bot compose l'expression texte
+  automatiquement, rien à taper à la main. `/filtre edit` pré-remplit le menu et le
+  formulaire avec les valeurs actuelles du profil (modifiable sans supprimer/recréer).
+  Recherche insensible à la casse et aux accents ("pokemon" = "Pokémon"). Expression en
+  texte libre (`ET`/`OU`/`NON`, parenthèses) toujours possible via `/filtre test` pour
+  composer/valider un cas plus avancé.
 - **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan, Cultura fonctionnels. Fnac et
   King Jouet bloqués par un CAPTCHA Datadome (pas d'adapter, volontairement — voir
   [docs/SITES.md](docs/SITES.md) pour le détail, y compris les sites évalués et écartés).
 - **Un salon Discord dédié par filtre**, auto-créé/supprimé, pour ne jamais mélanger
   les alertes de plusieurs profils. Optionnellement privé (`private:true`, visible
-  uniquement par le créateur + les admins).
+  uniquement par le créateur + les admins). Chaque alerte ghost ping le créateur du
+  profil (ping + suppression immédiate, x5) pour une notification garantie sans
+  polluer le salon de mentions.
 - **Salon tableau de bord**, **salon d'aide** et **salon log** auto-créés et toujours à
   jour (flux d'évènements en direct + résumé périodique pour ce dernier) — rien à
   configurer à la main.

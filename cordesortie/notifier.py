@@ -42,6 +42,23 @@ def build_alert_embed(item: Item, profile: FilterProfile) -> discord.Embed:
     return embed
 
 
+_GHOST_PING_COUNT = 5
+
+
+async def _ghost_ping(channel: discord.TextChannel, user_id: int) -> None:
+    """Ping puis supprime immédiatement le message, répété plusieurs fois de
+    suite — déclenche une notification mobile/desktop pour le créateur du
+    profil sans laisser de mentions traîner dans le salon d'alerte. S'arrête
+    au premier échec (rate limit, permission) plutôt que de s'acharner."""
+    for _ in range(_GHOST_PING_COUNT):
+        try:
+            message = await channel.send(f"<@{user_id}>")
+            await message.delete()
+        except discord.HTTPException:
+            logger.warning("Échec du ghost ping pour %s dans %s", user_id, channel.id)
+            return
+
+
 async def send_alert(guild: discord.Guild, profile: FilterProfile, item: Item) -> None:
     channel = guild.get_channel(profile.alert_channel_id)
     if not isinstance(channel, discord.TextChannel):
@@ -56,6 +73,12 @@ async def send_alert(guild: discord.Guild, profile: FilterProfile, item: Item) -
         await channel.send(embed=build_alert_embed(item, profile))
     except discord.HTTPException:
         logger.warning("Échec d'envoi de l'alerte pour %s dans %s", profile.name, channel.id)
+        return
+
+    # None pour les profils créés avant l'ajout de cette fonctionnalité — on
+    # poste quand même l'alerte, juste sans ghost ping (voir config/models.py).
+    if profile.creator_id is not None:
+        await _ghost_ping(channel, profile.creator_id)
 
 
 async def get_log_channel(bot: CordeSortieBot, guild: discord.Guild) -> discord.TextChannel | None:

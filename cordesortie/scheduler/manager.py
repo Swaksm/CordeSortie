@@ -210,6 +210,16 @@ class SchedulerManager:
 
             if error is not None:
                 await log_event(self.bot, guild, f"⚠️ **{site}** : erreur — {error}")
+            elif not items:
+                # Distinct du cas "0 match" ci-dessous : 0 item veut dire que le
+                # site n'a rien renvoyé du tout (site down, adapter cassé par un
+                # changement de structure...), pas juste que le filtre est strict.
+                await log_event(self.bot, guild, f"⚠️ **{site}** : 0 item trouvé")
+            elif matched_total == 0:
+                # Le nombre d'items scrapés est plafonné à une page de résultats
+                # (pas de pagination) donc peu informatif ici — seul le fait
+                # qu'il y en ait au moins un compte (voir cas précédent).
+                await log_event(self.bot, guild, f"🔍 **{site}** : 0 match")
             else:
                 await log_event(
                     self.bot,

@@ -15,7 +15,12 @@ from ..notifier import log_event
 from ..scraper import REGISTRY
 from ..sites import SUPPORTED_SITES
 from .alert_channels import create_alert_channel, delete_alert_channel
-from .expression_builder import ExpressionBuilderError, build_expression
+from .expression_builder import (
+    DecomposedExpression,
+    ExpressionBuilderError,
+    build_expression,
+    decompose_expression,
+)
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
 
@@ -46,9 +51,9 @@ class _SiteSelect(discord.ui.Select):
     disponibles ou non.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, preselected: frozenset[str] = frozenset()) -> None:
         options = [
-            discord.SelectOption(label=site, value=site)
+            discord.SelectOption(label=site, value=site, default=site in preselected)
             for site in SUPPORTED_SITES
             if site in REGISTRY
         ]
@@ -70,12 +75,18 @@ class _SiteSelect(discord.ui.Select):
 
 
 class _SiteSelectView(discord.ui.View):
-    def __init__(self, on_confirm) -> None:  # noqa: ANN001 - callback typé plus bas
+    def __init__(
+        self, on_confirm, preselected: list[str] | None = None  # noqa: ANN001
+    ) -> None:
         super().__init__(timeout=300)
-        self.selected_sites: list[str] = []
+        # Pré-rempli via `default=True` sur les options (cases déjà cochées) —
+        # mais initialisé aussi ici pour le cas où l'utilisateur clique
+        # directement sur Continuer sans toucher au menu (callback jamais
+        # déclenché, donc jamais mis à jour autrement).
+        self.selected_sites: list[str] = list(preselected) if preselected else []
         self.message: discord.Message | None = None
         self._on_confirm = on_confirm
-        self.add_item(_SiteSelect())
+        self.add_item(_SiteSelect(preselected=frozenset(preselected or ())))
 
     @discord.ui.button(label="Continuer", style=discord.ButtonStyle.primary)
     async def confirm(
@@ -103,9 +114,11 @@ class _FilterConditionsModal(discord.ui.Modal, title="Conditions du filtre"):
     """Formulaire interactif remplaçant la saisie d'une expression en texte
     libre (guillemets/ET/OU/parenthèses) — un mot par ligne dans 3 champs
     séparés, traduits en expression via cordesortie/commands/expression_builder.py.
-    Ne couvre pas l'imbrication arbitraire de la grammaire (voir `/filtre edit`
-    ou `/filtre test` pour ça), mais couvre le cas d'usage courant sans risque
-    de faute de syntaxe.
+    Utilisé par `/filtre add` (formulaire vide) et `/filtre edit` (pré-rempli
+    via `decompose_expression`, voir `prefill`). Ne couvre pas l'imbrication
+    arbitraire de la grammaire (voir `/filtre test` pour composer/valider une
+    expression plus complexe à la main), mais couvre le cas d'usage courant
+    sans risque de faute de syntaxe.
     """
 
     # Labels limités à 45 caractères côté Discord (erreur 400 sinon) — le détail
@@ -132,9 +145,17 @@ class _FilterConditionsModal(discord.ui.Modal, title="Conditions du filtre"):
         max_length=500,
     )
 
-    def __init__(self, on_submit) -> None:  # noqa: ANN001 - callback typé plus bas
+    def __init__(
+        self,
+        on_submit,  # noqa: ANN001 - callback typé plus bas
+        prefill: DecomposedExpression | None = None,
+    ) -> None:
         super().__init__()
         self._on_submit = on_submit
+        if prefill is not None:
+            self.must_all.default = prefill.must_all
+            self.any_of.default = prefill.any_of
+            self.exclude.default = prefill.exclude
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
@@ -316,6 +337,7 @@ class FilterCog(commands.Cog):
                 price_max=price_max,
                 only_available=only_available,
                 private=private,
+                creator_id=interaction.user.id,
             )
             config.profiles.append(profile)
             store.save(interaction.guild_id, config)
@@ -404,14 +426,12 @@ class FilterCog(commands.Cog):
                 f"Profil **{name}** supprimé.{note}", ephemeral=True
             )
 
-    @filtre_group.command(name="edit", description="Modifier un profil de filtre existant")
+    @filtre_group.command(
+        name="edit",
+        description="Modifier un profil existant (menu + formulaire, pré-remplis)",
+    )
     @app_commands.describe(
         name="Nom du profil à modifier",
-        expression=(
-            'Nouvelle expression de filtre, ex. "pokemon" ET ("30 ans" OU "30 years") '
-            "(optionnel, sinon inchangé)"
-        ),
-        sites="Nouveaux sites séparés par des virgules (optionnel, sinon inchangé)",
         price_min="Nouveau prix minimum (optionnel, sinon inchangé)",
         price_max="Nouveau prix maximum (optionnel, sinon inchangé)",
         only_available="N'alerter que si disponible (optionnel, sinon inchangé)",
@@ -422,8 +442,6 @@ class FilterCog(commands.Cog):
         self,
         interaction: discord.Interaction,
         name: str,
-        expression: str | None = None,
-        sites: str | None = None,
         price_min: float | None = None,
         price_max: float | None = None,
         only_available: bool | None = None,
@@ -435,13 +453,60 @@ class FilterCog(commands.Cog):
             )
             return
 
-        if all(
-            v is None
-            for v in (expression, sites, price_min, price_max, only_available, interval_minutes)
-        ):
+        config = self.bot.config_store.load(interaction.guild_id)
+        profile = config.get_profile(name)
+        if profile is None:
             await interaction.response.send_message(
-                "Aucun changement fourni. Précise au moins un paramètre à modifier.",
-                ephemeral=True,
+                f"Aucun profil nommé **{name}**.", ephemeral=True
+            )
+            return
+
+        # Même flux en 2 étapes que /filtre add, mais menu et formulaire
+        # pré-remplis avec les valeurs actuelles du profil : il suffit de
+        # cliquer Continuer / soumettre sans rien changer pour ne rien
+        # modifier, ou de retoucher juste ce qu'on veut changer.
+        prefill = decompose_expression(profile.filter_expression)
+
+        async def on_sites_confirmed(
+            select_interaction: discord.Interaction, site_list: list[str]
+        ) -> None:
+            async def on_submit(modal_interaction: discord.Interaction, expression: str) -> None:
+                await self._apply_edit(
+                    modal_interaction,
+                    name=name,
+                    site_list=site_list,
+                    expression=expression,
+                    price_min=price_min,
+                    price_max=price_max,
+                    only_available=only_available,
+                    interval_minutes=interval_minutes,
+                )
+
+            await select_interaction.response.send_modal(
+                _FilterConditionsModal(on_submit, prefill=prefill)
+            )
+
+        view = _SiteSelectView(on_sites_confirmed, preselected=profile.sites)
+        await interaction.response.send_message(
+            f"**Étape 1/2** — Sites surveillés par **{name}** :", view=view, ephemeral=True
+        )
+        view.message = await interaction.original_response()
+
+    async def _apply_edit(
+        self,
+        interaction: discord.Interaction,
+        *,
+        name: str,
+        site_list: list[str],
+        expression: str,
+        price_min: float | None,
+        price_max: float | None,
+        only_available: bool | None,
+        interval_minutes: int | None,
+    ) -> None:
+        if interaction.guild_id is None or interaction.guild is None:
+            await interaction.response.send_message(
+                "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
 
@@ -456,15 +521,13 @@ class FilterCog(commands.Cog):
                 )
                 return
 
-            # Note : il n'y a pas moyen d'effacer price_min/price_max via /filtre edit
-            # (None signifie "inchangé" ici) — remove + add si besoin de les retirer.
+            # Sites et expression viennent toujours du menu/formulaire (déjà
+            # pré-remplis avec les valeurs actuelles). Note : il n'y a pas
+            # moyen d'effacer price_min/price_max ici (None = inchangé pour
+            # ces deux champs précis) — remove + add si besoin de les retirer.
             updated_fields = profile.model_dump()
-            if expression is not None:
-                updated_fields["filter_expression"] = expression
-            if sites is not None:
-                updated_fields["sites"] = [
-                    s.strip().lower() for s in sites.split(",") if s.strip()
-                ]
+            updated_fields["sites"] = site_list
+            updated_fields["filter_expression"] = expression
             if price_min is not None:
                 updated_fields["price_min"] = price_min
             if price_max is not None:
@@ -684,9 +747,19 @@ class FilterCog(commands.Cog):
                 )
             ]
             total_matches += len(matches)
-            lines.append(
-                f"- **{site}** : {len(items)} item(s) scrapé(s), {len(matches)} match(s)"
-            )
+            if not items:
+                # Distinct du cas "0 match" ci-dessous : 0 item veut dire que le
+                # site n'a rien renvoyé du tout (site down, adapter cassé...),
+                # pas juste que le filtre est strict.
+                lines.append(f"- **{site}** : 0 item trouvé")
+            elif not matches:
+                # Le nombre d'items scrapés est plafonné à une page de résultats
+                # (pas de pagination) donc peu informatif ici.
+                lines.append(f"- **{site}** : 0 match")
+            else:
+                lines.append(
+                    f"- **{site}** : {len(items)} item(s) scrapé(s), {len(matches)} match(s)"
+                )
             for item in matches[:_DRY_RUN_MAX_ITEMS_PER_SITE]:
                 price_str = f"{item.price} €" if item.price is not None else "prix inconnu"
                 lines.append(f"  - {item.title} — {price_str} — <{item.url}>")

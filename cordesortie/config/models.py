@@ -28,6 +28,9 @@ class FilterProfile(BaseModel):
     only_available: bool = True
     private: bool = False
     paused: bool = False
+    # None pour les profils créés avant l'ajout du ghost ping (voir notifier.py) —
+    # dans ce cas, l'alerte reste postée normalement, juste sans ghost ping.
+    creator_id: int | None = None
 
     @field_validator("filter_expression")
     @classmethod

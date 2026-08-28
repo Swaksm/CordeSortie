@@ -198,6 +198,21 @@ l'URL de la page ne change pas — seul un iframe pointe vers
 `captcha-delivery.com`) : pas d'adapter, ajouté à `SITE_NOTES` comme Fnac. Voir
 docs/SITES.md pour le détail par site.
 
+**`/filtre edit` guidé du 2026-08-28** : même flux interactif que `/filtre add`
+(menu de sites + formulaire de conditions), mais pré-rempli avec les valeurs
+actuelles du profil — `decompose_expression()` dans `expression_builder.py`
+reconstruit les 3 champs à partir de l'expression stockée (retourne `None` et
+laisse le formulaire vide si l'expression est trop complexe pour être
+redécomposée fidèlement, ex. imbrication manuelle non standard). 65 tests.
+
+**Ghost ping du créateur sur alerte (2026-08-28)** : `FilterProfile.creator_id`
+(nouveau champ, `None` pour les profils créés avant — l'alerte part quand même,
+juste sans ghost ping) enregistré à la création du profil. `send_alert()`
+poste l'embed d'alerte puis ping/supprime immédiatement un message mentionnant
+le créateur, 5 fois de suite (notification mobile/desktop sans polluer le
+salon avec des mentions qui restent) — s'arrête au premier échec (rate limit).
+69 tests.
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées
