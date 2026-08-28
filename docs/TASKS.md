@@ -166,6 +166,20 @@ est prêt et testé, indépendant de la plateforme choisie in fine.
 37 tests au total, testé en direct sur Discord (config existante restée compatible,
 aucun reset nécessaire — tous les nouveaux champs ont des valeurs par défaut).
 
+**Audit complet du 2026-08-28** : revue ligne par ligne de tout `cordesortie/`.
+Corrigé : race condition load/mutation/save non verrouillée sur les commandes
+`/filtre add|remove|edit|pause|resume` et `/config set-log-channel` (deux
+commandes concurrentes sur le même serveur pouvaient s'écraser mutuellement —
+verrou `asyncio.Lock` par serveur ajouté dans `ConfigStore.lock()`), doublon de
+nom de profil insensible à la casse pouvant générer deux salons d'alerte
+identiques (`/filtre add` compare maintenant en minuscules), logs mal encodés
+sur console Windows (accents illisibles — `stdout`/`stderr` reconfigurés en
+UTF-8 dans `__main__.py`). Non corrigé (signalé, impact jugé trop faible pour
+le coût du changement) : `ConfigStore.load/save` fait de l'I/O disque
+synchrone dans les boucles asyncio du scheduler, ce qui bloque brièvement
+l'event loop à chaque cycle — acceptable tant que la config reste un petit
+fichier JSON local. 37 tests toujours verts, ruff clean.
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées

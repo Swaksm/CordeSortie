@@ -6,6 +6,8 @@ DATA_DIR doit pointer vers un volume persistant — voir docs/ARCHITECTURE.md §
 
 from __future__ import annotations
 
+import asyncio
+from collections import defaultdict
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -20,6 +22,15 @@ class ConfigError(Exception):
 class ConfigStore:
     def __init__(self, data_dir: Path | str) -> None:
         self.data_dir = Path(data_dir)
+        self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    def lock(self, guild_id: int) -> asyncio.Lock:
+        """Verrou par serveur, à tenir pendant tout cycle load()-mutation-save()
+        d'une commande : sans lui, deux commandes concurrentes sur le même
+        serveur (ex. deux `/filtre add` quasi simultanés) peuvent chacune charger
+        la config avant que l'autre ait sauvegardé, et la dernière écriture
+        écrase silencieusement les changements de la première."""
+        return self._locks[guild_id]
 
     def _path(self, guild_id: int) -> Path:
         return self.data_dir / str(guild_id) / "config.json"

@@ -37,9 +37,10 @@ class ConfigCog(commands.Cog):
             return
 
         store = self.bot.config_store
-        config = store.load(interaction.guild_id)
-        config.log_channel_id = channel.id
-        store.save(interaction.guild_id, config)
+        async with store.lock(interaction.guild_id):
+            config = store.load(interaction.guild_id)
+            config.log_channel_id = channel.id
+            store.save(interaction.guild_id, config)
 
         try:
             await self.bot.scheduler.refresh_guild(interaction.guild_id)

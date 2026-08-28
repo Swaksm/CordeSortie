@@ -75,107 +75,108 @@ class FilterCog(commands.Cog):
             return
 
         store = self.bot.config_store
-        config = store.load(interaction.guild_id)
+        async with store.lock(interaction.guild_id):
+            config = store.load(interaction.guild_id)
 
-        if config.get_profile(name) is not None:
-            await interaction.response.send_message(
-                f"Un profil nommé **{name}** existe déjà. Supprime-le d'abord avec "
-                f"`/filtre remove name:{name}` si tu veux le remplacer.",
-                ephemeral=True,
-            )
-            return
+            if any(p.name.lower() == name.lower() for p in config.profiles):
+                await interaction.response.send_message(
+                    f"Un profil nommé **{name}** existe déjà. Supprime-le d'abord avec "
+                    f"`/filtre remove name:{name}` si tu veux le remplacer.",
+                    ephemeral=True,
+                )
+                return
 
-        site_list = [s.strip().lower() for s in sites.split(",") if s.strip()]
+            site_list = [s.strip().lower() for s in sites.split(",") if s.strip()]
 
-        # Valide les champs avant de créer quoi que ce soit sur Discord — évite de
-        # créer un salon pour un profil qui sera de toute façon rejeté.
-        try:
-            FilterProfile(
+            # Valide les champs avant de créer quoi que ce soit sur Discord — évite de
+            # créer un salon pour un profil qui sera de toute façon rejeté.
+            try:
+                FilterProfile(
+                    name=name,
+                    sites=site_list,
+                    filter_expression=expression,
+                    alert_channel_id=0,
+                    scrape_interval_minutes=interval,
+                    price_min=price_min,
+                    price_max=price_max,
+                    only_available=only_available,
+                    private=private,
+                )
+            except ValidationError as exc:
+                await interaction.response.send_message(
+                    f"Profil invalide :\n{_format_validation_error(exc)}", ephemeral=True
+                )
+                return
+
+            await interaction.response.defer(ephemeral=True)
+
+            try:
+                channel = await create_alert_channel(
+                    interaction.guild,
+                    creator=interaction.user,
+                    profile_name=name,
+                    private=private,
+                )
+            except discord.Forbidden:
+                await interaction.followup.send(
+                    "Je n'ai pas la permission de créer un salon (il me faut "
+                    "**Gérer les salons**). Profil non créé.",
+                    ephemeral=True,
+                )
+                return
+            except discord.HTTPException as exc:
+                await interaction.followup.send(
+                    f"Échec de création du salon d'alerte : {exc}. Profil non créé.",
+                    ephemeral=True,
+                )
+                return
+
+            profile = FilterProfile(
                 name=name,
                 sites=site_list,
                 filter_expression=expression,
-                alert_channel_id=0,
+                alert_channel_id=channel.id,
                 scrape_interval_minutes=interval,
                 price_min=price_min,
                 price_max=price_max,
                 only_available=only_available,
                 private=private,
             )
-        except ValidationError as exc:
-            await interaction.response.send_message(
-                f"Profil invalide :\n{_format_validation_error(exc)}", ephemeral=True
+            config.profiles.append(profile)
+            store.save(interaction.guild_id, config)
+
+            created_at_str = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
+            details = format_profile_details(
+                profile, creator_mention=interaction.user.mention, created_at_str=created_at_str
             )
-            return
+            try:
+                info_message = await channel.send(details)
+                await info_message.pin()
+            except discord.HTTPException:
+                logger.warning("Message/épinglage impossible dans le salon %s", channel.id)
 
-        await interaction.response.defer(ephemeral=True)
+            try:
+                await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+            except discord.HTTPException:
+                logger.warning("Mise à jour du salon info impossible")
 
-        try:
-            channel = await create_alert_channel(
+            try:
+                await self.bot.scheduler.refresh_guild(interaction.guild_id)
+            except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+                logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+            await log_event(
+                self.bot,
                 interaction.guild,
-                creator=interaction.user,
-                profile_name=name,
-                private=private,
+                f"🆕 Filtre **{name}** créé — sites: {', '.join(site_list)}, "
+                f"intervalle {interval} min, par {interaction.user.mention}",
             )
-        except discord.Forbidden:
+
             await interaction.followup.send(
-                "Je n'ai pas la permission de créer un salon (il me faut "
-                "**Gérer les salons**). Profil non créé.",
+                f"Profil **{name}** créé sur {', '.join(site_list)}. "
+                f"Alertes dans {channel.mention}.",
                 ephemeral=True,
             )
-            return
-        except discord.HTTPException as exc:
-            await interaction.followup.send(
-                f"Échec de création du salon d'alerte : {exc}. Profil non créé.",
-                ephemeral=True,
-            )
-            return
-
-        profile = FilterProfile(
-            name=name,
-            sites=site_list,
-            filter_expression=expression,
-            alert_channel_id=channel.id,
-            scrape_interval_minutes=interval,
-            price_min=price_min,
-            price_max=price_max,
-            only_available=only_available,
-            private=private,
-        )
-        config.profiles.append(profile)
-        store.save(interaction.guild_id, config)
-
-        created_at_str = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
-        details = format_profile_details(
-            profile, creator_mention=interaction.user.mention, created_at_str=created_at_str
-        )
-        try:
-            info_message = await channel.send(details)
-            await info_message.pin()
-        except discord.HTTPException:
-            logger.warning("Message/épinglage impossible dans le salon %s", channel.id)
-
-        try:
-            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
-        except discord.HTTPException:
-            logger.warning("Mise à jour du salon info impossible")
-
-        try:
-            await self.bot.scheduler.refresh_guild(interaction.guild_id)
-        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
-            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
-
-        await log_event(
-            self.bot,
-            interaction.guild,
-            f"🆕 Filtre **{name}** créé — sites: {', '.join(site_list)}, "
-            f"intervalle {interval} min, par {interaction.user.mention}",
-        )
-
-        await interaction.followup.send(
-            f"Profil **{name}** créé sur {', '.join(site_list)}. "
-            f"Alertes dans {channel.mention}.",
-            ephemeral=True,
-        )
 
     @filtre_group.command(name="remove", description="Supprimer un profil de filtre")
     @app_commands.describe(name="Nom du profil à supprimer")
@@ -188,43 +189,44 @@ class FilterCog(commands.Cog):
             return
 
         store = self.bot.config_store
-        config = store.load(interaction.guild_id)
-        profile = config.get_profile(name)
+        async with store.lock(interaction.guild_id):
+            config = store.load(interaction.guild_id)
+            profile = config.get_profile(name)
 
-        if profile is None:
+            if profile is None:
+                await interaction.response.send_message(
+                    f"Aucun profil nommé **{name}**.", ephemeral=True
+                )
+                return
+
+            config.profiles.remove(profile)
+            store.save(interaction.guild_id, config)
+
+            note = ""
+            try:
+                deleted = await delete_alert_channel(interaction.guild, profile.alert_channel_id)
+                if not deleted:
+                    note = " (le salon d'alerte était déjà supprimé)"
+            except discord.Forbidden:
+                note = " (permission manquante pour supprimer le salon, à faire manuellement)"
+            except discord.HTTPException:
+                note = " (erreur lors de la suppression du salon)"
+
+            try:
+                await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+            except discord.HTTPException:
+                logger.warning("Mise à jour du salon info impossible")
+
+            try:
+                await self.bot.scheduler.refresh_guild(interaction.guild_id)
+            except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+                logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+            await log_event(self.bot, interaction.guild, f"🗑️ Filtre **{name}** supprimé")
+
             await interaction.response.send_message(
-                f"Aucun profil nommé **{name}**.", ephemeral=True
+                f"Profil **{name}** supprimé.{note}", ephemeral=True
             )
-            return
-
-        config.profiles.remove(profile)
-        store.save(interaction.guild_id, config)
-
-        note = ""
-        try:
-            deleted = await delete_alert_channel(interaction.guild, profile.alert_channel_id)
-            if not deleted:
-                note = " (le salon d'alerte était déjà supprimé)"
-        except discord.Forbidden:
-            note = " (permission manquante pour supprimer le salon, à faire manuellement)"
-        except discord.HTTPException:
-            note = " (erreur lors de la suppression du salon)"
-
-        try:
-            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
-        except discord.HTTPException:
-            logger.warning("Mise à jour du salon info impossible")
-
-        try:
-            await self.bot.scheduler.refresh_guild(interaction.guild_id)
-        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
-            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
-
-        await log_event(self.bot, interaction.guild, f"🗑️ Filtre **{name}** supprimé")
-
-        await interaction.response.send_message(
-            f"Profil **{name}** supprimé.{note}", ephemeral=True
-        )
 
     @filtre_group.command(name="edit", description="Modifier un profil de filtre existant")
     @app_commands.describe(
@@ -265,59 +267,65 @@ class FilterCog(commands.Cog):
             return
 
         store = self.bot.config_store
-        config = store.load(interaction.guild_id)
-        profile = config.get_profile(name)
+        async with store.lock(interaction.guild_id):
+            config = store.load(interaction.guild_id)
+            profile = config.get_profile(name)
 
-        if profile is None:
-            await interaction.response.send_message(
-                f"Aucun profil nommé **{name}**.", ephemeral=True
+            if profile is None:
+                await interaction.response.send_message(
+                    f"Aucun profil nommé **{name}**.", ephemeral=True
+                )
+                return
+
+            # Note : il n'y a pas moyen d'effacer price_min/price_max via /filtre edit
+            # (None signifie "inchangé" ici) — remove + add si besoin de les retirer.
+            updated_fields = profile.model_dump()
+            if expression is not None:
+                updated_fields["filter_expression"] = expression
+            if sites is not None:
+                updated_fields["sites"] = [
+                    s.strip().lower() for s in sites.split(",") if s.strip()
+                ]
+            if price_min is not None:
+                updated_fields["price_min"] = price_min
+            if price_max is not None:
+                updated_fields["price_max"] = price_max
+            if only_available is not None:
+                updated_fields["only_available"] = only_available
+            if interval_minutes is not None:
+                updated_fields["scrape_interval_minutes"] = interval_minutes
+
+            try:
+                new_profile = FilterProfile(**updated_fields)
+            except ValidationError as exc:
+                await interaction.response.send_message(
+                    f"Modification invalide :\n{_format_validation_error(exc)}", ephemeral=True
+                )
+                return
+
+            config.profiles[config.profiles.index(profile)] = new_profile
+            store.save(interaction.guild_id, config)
+
+            try:
+                await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+            except discord.HTTPException:
+                logger.warning("Mise à jour du salon info impossible")
+
+            try:
+                await self.bot.scheduler.refresh_guild(interaction.guild_id)
+            except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+                logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+            await log_event(
+                self.bot,
+                interaction.guild,
+                f"✏️ Filtre **{name}** modifié par {interaction.user.mention}",
             )
-            return
 
-        # Note : il n'y a pas moyen d'effacer price_min/price_max via /filtre edit
-        # (None signifie "inchangé" ici) — remove + add si besoin de les retirer.
-        updated_fields = profile.model_dump()
-        if expression is not None:
-            updated_fields["filter_expression"] = expression
-        if sites is not None:
-            updated_fields["sites"] = [s.strip().lower() for s in sites.split(",") if s.strip()]
-        if price_min is not None:
-            updated_fields["price_min"] = price_min
-        if price_max is not None:
-            updated_fields["price_max"] = price_max
-        if only_available is not None:
-            updated_fields["only_available"] = only_available
-        if interval_minutes is not None:
-            updated_fields["scrape_interval_minutes"] = interval_minutes
-
-        try:
-            new_profile = FilterProfile(**updated_fields)
-        except ValidationError as exc:
             await interaction.response.send_message(
-                f"Modification invalide :\n{_format_validation_error(exc)}", ephemeral=True
+                f"Profil **{name}** mis à jour.\n{format_profile_line(new_profile)}",
+                ephemeral=True,
             )
-            return
-
-        config.profiles[config.profiles.index(profile)] = new_profile
-        store.save(interaction.guild_id, config)
-
-        try:
-            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
-        except discord.HTTPException:
-            logger.warning("Mise à jour du salon info impossible")
-
-        try:
-            await self.bot.scheduler.refresh_guild(interaction.guild_id)
-        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
-            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
-
-        await log_event(
-            self.bot, interaction.guild, f"✏️ Filtre **{name}** modifié par {interaction.user.mention}"
-        )
-
-        await interaction.response.send_message(
-            f"Profil **{name}** mis à jour.\n{format_profile_line(new_profile)}", ephemeral=True
-        )
 
     async def _set_paused(
         self, interaction: discord.Interaction, name: str, *, paused: bool
@@ -329,41 +337,44 @@ class FilterCog(commands.Cog):
             return
 
         store = self.bot.config_store
-        config = store.load(interaction.guild_id)
-        profile = config.get_profile(name)
+        async with store.lock(interaction.guild_id):
+            config = store.load(interaction.guild_id)
+            profile = config.get_profile(name)
 
-        if profile is None:
-            await interaction.response.send_message(
-                f"Aucun profil nommé **{name}**.", ephemeral=True
+            if profile is None:
+                await interaction.response.send_message(
+                    f"Aucun profil nommé **{name}**.", ephemeral=True
+                )
+                return
+
+            if profile.paused == paused:
+                already = "déjà en pause" if paused else "déjà actif"
+                await interaction.response.send_message(
+                    f"Profil **{name}** {already}.", ephemeral=True
+                )
+                return
+
+            config.profiles[config.profiles.index(profile)] = profile.model_copy(
+                update={"paused": paused}
             )
-            return
+            store.save(interaction.guild_id, config)
 
-        if profile.paused == paused:
-            already = "déjà en pause" if paused else "déjà actif"
+            try:
+                await update_info_channel(interaction.guild, config, store, interaction.guild_id)
+            except discord.HTTPException:
+                logger.warning("Mise à jour du salon info impossible")
+
+            try:
+                await self.bot.scheduler.refresh_guild(interaction.guild_id)
+            except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
+                logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
+
+            verb, emoji = ("mis en pause", "⏸️") if paused else ("repris", "▶️")
+            await log_event(self.bot, interaction.guild, f"{emoji} Filtre **{name}** {verb}")
+
             await interaction.response.send_message(
-                f"Profil **{name}** {already}.", ephemeral=True
+                f"Profil **{name}** {verb}.", ephemeral=True
             )
-            return
-
-        config.profiles[config.profiles.index(profile)] = profile.model_copy(
-            update={"paused": paused}
-        )
-        store.save(interaction.guild_id, config)
-
-        try:
-            await update_info_channel(interaction.guild, config, store, interaction.guild_id)
-        except discord.HTTPException:
-            logger.warning("Mise à jour du salon info impossible")
-
-        try:
-            await self.bot.scheduler.refresh_guild(interaction.guild_id)
-        except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
-            logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
-
-        verb, emoji = ("mis en pause", "⏸️") if paused else ("repris", "▶️")
-        await log_event(self.bot, interaction.guild, f"{emoji} Filtre **{name}** {verb}")
-
-        await interaction.response.send_message(f"Profil **{name}** {verb}.", ephemeral=True)
 
     @filtre_group.command(
         name="pause", description="Met en pause un seul profil de filtre (pas tout le bot)"
