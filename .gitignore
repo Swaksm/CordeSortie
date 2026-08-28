@@ -4,6 +4,10 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
+.coverage
+coverage.xml
+.ruff_cache/
 
 # Secrets / env
 .env

@@ -9,7 +9,12 @@ c'est la référence pour savoir où on en est, pas la conversation.
 - [x] Init git
 - [x] Squelette Python (`requirements.txt`, structure de dossiers)
 - [x] `.env.example` (token Discord, chemins config)
-- [ ] CI minimale (lint + un test qui importe le package) — optionnel mais utile tôt
+- [x] CI GitHub Actions (`.github/workflows/ci.yml`) : lint (`ruff`) + tests
+      (`pytest`, matrice Python 3.12/3.13) avec couverture de code (`pytest-cov`,
+      branch coverage, seuil `--cov-fail-under=35` pour ne pas casser le build sur
+      la couverture actuelle réelle ~39%, faible car adapters/commandes Discord
+      nécessitent un vrai navigateur/serveur Discord). Rapport de couverture
+      affiché dans le résumé de run GitHub et exporté en artefact XML.
 
 ## Phase 1 — Bot Discord de base
 

@@ -12,8 +12,8 @@ from pydantic import ValidationError
 from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..notifier import log_event
-from ..sites import SUPPORTED_SITES
 from ..scraper import REGISTRY
+from ..sites import SUPPORTED_SITES
 from .alert_channels import create_alert_channel, delete_alert_channel
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
