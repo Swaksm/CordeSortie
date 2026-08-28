@@ -1,0 +1,13 @@
+services:
+  cordesortie:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Force le chemin du conteneur quel que soit le contenu de .env (utile
+      # en local hors Docker, où DATA_DIR="data" est le bon réglage) — voir
+      # Dockerfile.
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data

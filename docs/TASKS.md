@@ -141,6 +141,13 @@ est prêt et testé, indépendant de la plateforme choisie in fine.
 - [x] `Dockerfile` (build + import testés en local avec Docker, y compris Playwright)
 - [x] Repo GitHub créé et code poussé (nécessaire pour connecter n'importe quelle
       plateforme de déploiement)
+- [x] `docker-compose.yml` (2026-08-28) : volume `./data:/data` persistant,
+      `restart: unless-stopped`, `DATA_DIR` forcé indépendamment du contenu de
+      `.env`. Build + démarrage + persistance du volume testés de bout en bout en
+      local (Windows/Docker Desktop). README réécrit avec cette procédure comme
+      chemin recommandé, y compris une section Raspberry Pi (OS 64 bits requis —
+      pas de build Chromium pour l'ARM 32 bits — non testé sur du vrai matériel ARM
+      dans ce dépôt) et un service systemd pour l'installation manuelle sans Docker.
 - [ ] Choisir la plateforme définitive (Render / Railway / Oracle Cloud / auto-hébergé)
 - [ ] Service créé, connecté au repo, `DISCORD_TOKEN` en variable d'environnement
 - [ ] Volume/disque persistant monté sur `/data`
