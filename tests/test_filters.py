@@ -18,6 +18,17 @@ def test_contains_is_case_insensitive():
     assert matches_item(node, text="coffret 30 ans", price=50, available=True)
 
 
+def test_contains_is_accent_insensitive():
+    # Les sites marchands orthographient "pokemon"/"Pokémon" de façon
+    # incohérente d'une fiche produit à l'autre — le filtre doit ignorer
+    # l'accent dans les deux sens.
+    node_no_accent = parse_filter('contient("pokemon")')
+    assert matches_item(node_no_accent, text="Coffret Pokémon", price=50, available=True)
+
+    node_with_accent = parse_filter('contient("pokémon")')
+    assert matches_item(node_with_accent, text="Coffret Pokemon", price=50, available=True)
+
+
 def test_and():
     node = parse_filter('contient("30") ET contient("ans")')
     assert matches_item(node, text="Coffret 30 ans", price=50, available=True)

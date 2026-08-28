@@ -29,24 +29,32 @@ _CONTINUATION_HEADER = "**CordeSortie — commandes (suite)**"
 # syntaxe en une ligne, mais un exemple posé avec du texte autour est plus
 # facile à suivre pour un premier filtre que de la déduire depuis 3 commandes
 # différentes.
-_FILTER_SYNTAX_GUIDE = """**🔎 Comment écrire une expression de filtre**
+_FILTER_SYNTAX_GUIDE = """**🔎 Créer un filtre — comment ça marche**
 
-Le plus simple : mets juste le texte à chercher entre guillemets.
-> `"pokemon"` → matche tout item dont le titre contient "pokemon"
+`/filtre add` te guide en 2 étapes, sans rien taper à la main pour la partie
+piège :
+1. Un **menu à cocher** pour choisir les sites à surveiller (fini les fautes
+   de frappe sur le nom d'un site).
+2. Un **formulaire** avec 3 champs, un mot-clé par ligne :
+> **Doit contenir TOUS ces mots** — ex. `pokemon`
+> **Au moins UN de ces mots** (optionnel) — ex. `30 ans` puis `30 years` sur
+> une autre ligne
+> **Ne doit PAS contenir** (optionnel) — ex. `peluche`
 
-Combine plusieurs mots avec **ET** / **OU** :
+Le bot combine tout ça automatiquement en une expression valide. Pas de
+guillemets, ET/OU/NON ou parenthèses à taper toi-même.
+
+**Pour aller plus loin** (`/filtre edit`, `/filtre test`) : ces commandes
+prennent une expression en texte libre, avec la même logique mais écrite à la
+main :
+> `"pokemon"` → contient "pokemon"
 > `"pokemon" ET "coffret"` → doit contenir les deux
-> `"30 ans" OU "30 years"` → au moins un des deux
+> `("pokemon" OU "poke") ET ("30 ans" OU "30 years")` → parenthèses
+> obligatoires dès que tu mélanges ET et OU (sinon le bot refuse, pour éviter
+> toute ambiguïté)
+> `"pokemon" ET NON "peluche"` → exclut un mot
 
-Regroupe avec des **parenthèses** dès que tu mélanges ET et OU (obligatoire,
-sinon le bot refuse l'expression pour éviter toute ambiguïté) :
-> `("pokemon" OU "poke") ET ("30 ans" OU "30 years")`
-> → ("pokemon" ou "poke") **et** ("30 ans" ou "30 years")
-
-Exclus un mot avec **NON** :
-> `"pokemon" ET NON "peluche"`
-
-Astuce : teste ton expression sans créer de profil avec `/filtre test`."""
+Astuce : teste une expression sans créer de profil avec `/filtre test`."""
 
 
 def _generate_command_blocks(bot: commands.Bot) -> list[str]:

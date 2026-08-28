@@ -15,6 +15,7 @@ from ..notifier import log_event
 from ..scraper import REGISTRY
 from ..sites import SUPPORTED_SITES
 from .alert_channels import create_alert_channel, delete_alert_channel
+from .expression_builder import ExpressionBuilderError, build_expression
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
 
@@ -31,6 +32,124 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "\n".join(f"- {error['msg']}" for error in exc.errors())
 
 
+class _SiteSelect(discord.ui.Select):
+    """Menu déroulant à sélection multiple (cases à cocher côté Discord) —
+    remplace la saisie d'une liste de sites séparés par des virgules, source
+    d'erreur de frappe/orthographe puisque l'utilisateur ne connaît pas la
+    liste exacte des noms de site attendus.
+
+    Ne liste que les sites avec un adapter fonctionnel (REGISTRY), pas
+    `SUPPORTED_SITES` en entier : un site sans adapter (ex. Fnac, bloqué par
+    CAPTCHA — voir docs/SITES.md) ne renverra jamais d'item, le proposer ici
+    ne ferait que créer un profil qui a l'air de marcher mais n'alertera
+    jamais. `/sites` reste l'endroit où voir le statut de tous les sites,
+    disponibles ou non.
+    """
+
+    def __init__(self) -> None:
+        options = [
+            discord.SelectOption(label=site, value=site)
+            for site in SUPPORTED_SITES
+            if site in REGISTRY
+        ]
+        super().__init__(
+            placeholder="Choisis un ou plusieurs sites à surveiller",
+            min_values=1,
+            max_values=len(options),
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view: _SiteSelectView = self.view  # type: ignore[assignment]
+        view.selected_sites = list(self.values)
+        await interaction.response.edit_message(
+            content=f"Sites sélectionnés : {', '.join(view.selected_sites)}\n"
+            "Clique sur **Continuer** pour définir les conditions du filtre.",
+            view=view,
+        )
+
+
+class _SiteSelectView(discord.ui.View):
+    def __init__(self, on_confirm) -> None:  # noqa: ANN001 - callback typé plus bas
+        super().__init__(timeout=300)
+        self.selected_sites: list[str] = []
+        self.message: discord.Message | None = None
+        self._on_confirm = on_confirm
+        self.add_item(_SiteSelect())
+
+    @discord.ui.button(label="Continuer", style=discord.ButtonStyle.primary)
+    async def confirm(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if not self.selected_sites:
+            await interaction.response.send_message(
+                "Choisis au moins un site dans le menu avant de continuer.", ephemeral=True
+            )
+            return
+        self.stop()
+        await self._on_confirm(interaction, self.selected_sites)
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+
+class _FilterConditionsModal(discord.ui.Modal, title="Conditions du filtre"):
+    """Formulaire interactif remplaçant la saisie d'une expression en texte
+    libre (guillemets/ET/OU/parenthèses) — un mot par ligne dans 3 champs
+    séparés, traduits en expression via cordesortie/commands/expression_builder.py.
+    Ne couvre pas l'imbrication arbitraire de la grammaire (voir `/filtre edit`
+    ou `/filtre test` pour ça), mais couvre le cas d'usage courant sans risque
+    de faute de syntaxe.
+    """
+
+    # Labels limités à 45 caractères côté Discord (erreur 400 sinon) — le détail
+    # "un mot par ligne" est porté par les exemples multi-lignes en placeholder.
+    must_all = discord.ui.TextInput(
+        label="Doit contenir TOUS ces mots",
+        style=discord.TextStyle.paragraph,
+        placeholder="pokemon\ncoffret",
+        required=False,
+        max_length=500,
+    )
+    any_of = discord.ui.TextInput(
+        label="Au moins UN de ces mots (optionnel)",
+        style=discord.TextStyle.paragraph,
+        placeholder="30 ans\n30 years",
+        required=False,
+        max_length=500,
+    )
+    exclude = discord.ui.TextInput(
+        label="Ne doit PAS contenir (optionnel)",
+        style=discord.TextStyle.paragraph,
+        placeholder="peluche",
+        required=False,
+        max_length=500,
+    )
+
+    def __init__(self, on_submit) -> None:  # noqa: ANN001 - callback typé plus bas
+        super().__init__()
+        self._on_submit = on_submit
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            expression = build_expression(
+                must_all=self.must_all.value,
+                any_of=self.any_of.value,
+                exclude=self.exclude.value,
+            )
+        except ExpressionBuilderError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        await self._on_submit(interaction, expression)
+
+
 class FilterCog(commands.Cog):
     filtre_group = app_commands.Group(
         name="filtre", description="Gérer les profils de filtre CordeSortie"
@@ -39,14 +158,12 @@ class FilterCog(commands.Cog):
     def __init__(self, bot: CordeSortieBot) -> None:
         self.bot = bot
 
-    @filtre_group.command(name="add", description="Créer un profil de filtre")
+    @filtre_group.command(
+        name="add",
+        description="Créer un profil de filtre (menu + formulaire, rien à taper à la main)",
+    )
     @app_commands.describe(
         name="Nom du profil (unique)",
-        sites=f"Sites ciblés, séparés par des virgules ({', '.join(SUPPORTED_SITES)})",
-        expression=(
-            'Expression de filtre, ex. "pokemon" ET ("30 ans" OU "30 years") '
-            '— parenthèses obligatoires si tu mélanges ET et OU'
-        ),
         price_min="Prix minimum (optionnel)",
         price_max="Prix maximum (optionnel)",
         only_available="N'alerter que si l'item est disponible (par défaut : oui)",
@@ -61,8 +178,6 @@ class FilterCog(commands.Cog):
         self,
         interaction: discord.Interaction,
         name: str,
-        sites: str,
-        expression: str,
         price_min: float | None = None,
         price_max: float | None = None,
         only_available: bool = True,
@@ -71,6 +186,65 @@ class FilterCog(commands.Cog):
     ) -> None:
         interval = interval_minutes if interval_minutes is not None else DEFAULT_SCRAPE_INTERVAL_MINUTES
 
+        if interaction.guild_id is None or interaction.guild is None:
+            await interaction.response.send_message(
+                "Cette commande doit être utilisée dans un serveur.", ephemeral=True
+            )
+            return
+
+        config = self.bot.config_store.load(interaction.guild_id)
+        if any(p.name.lower() == name.lower() for p in config.profiles):
+            await interaction.response.send_message(
+                f"Un profil nommé **{name}** existe déjà. Supprime-le d'abord avec "
+                f"`/filtre remove name:{name}` si tu veux le remplacer.",
+                ephemeral=True,
+            )
+            return
+
+        # Deux étapes interactives avant la création : un menu à cocher pour les
+        # sites (évite de deviner l'orthographe exacte), puis un modal pour les
+        # conditions du filtre (voir _FilterConditionsModal). Chaque étape est une
+        # interaction Discord distincte (menu → clic bouton → soumission modal),
+        # donc chacune ne peut avoir qu'une seule réponse initiale.
+        async def on_sites_confirmed(
+            select_interaction: discord.Interaction, site_list: list[str]
+        ) -> None:
+            async def on_submit(modal_interaction: discord.Interaction, expression: str) -> None:
+                await self._create_profile(
+                    modal_interaction,
+                    name=name,
+                    site_list=site_list,
+                    expression=expression,
+                    price_min=price_min,
+                    price_max=price_max,
+                    only_available=only_available,
+                    interval=interval,
+                    private=private,
+                )
+
+            await select_interaction.response.send_modal(_FilterConditionsModal(on_submit))
+
+        view = _SiteSelectView(on_sites_confirmed)
+        await interaction.response.send_message(
+            "**Étape 1/2** — Choisis les sites à surveiller pour ce profil :",
+            view=view,
+            ephemeral=True,
+        )
+        view.message = await interaction.original_response()
+
+    async def _create_profile(
+        self,
+        interaction: discord.Interaction,
+        *,
+        name: str,
+        site_list: list[str],
+        expression: str,
+        price_min: float | None,
+        price_max: float | None,
+        only_available: bool,
+        interval: int,
+        private: bool,
+    ) -> None:
         if interaction.guild_id is None or interaction.guild is None:
             await interaction.response.send_message(
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
@@ -88,8 +262,6 @@ class FilterCog(commands.Cog):
                     ephemeral=True,
                 )
                 return
-
-            site_list = [s.strip().lower() for s in sites.split(",") if s.strip()]
 
             # Valide les champs avant de créer quoi que ce soit sur Discord — évite de
             # créer un salon pour un profil qui sera de toute façon rejeté.
@@ -176,7 +348,8 @@ class FilterCog(commands.Cog):
             )
 
             await interaction.followup.send(
-                f"Profil **{name}** créé sur {', '.join(site_list)}. "
+                f"Profil **{name}** créé sur {', '.join(site_list)}.\n"
+                f"Expression générée : `{expression}`\n"
                 f"Alertes dans {channel.mention}.",
                 ephemeral=True,
             )

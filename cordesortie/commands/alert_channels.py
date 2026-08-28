@@ -52,7 +52,10 @@ async def create_alert_channel(
     category = await get_or_create_category(guild, ALERT_CATEGORY_NAME)
     channel_name = slugify(f"{creator.name}-{profile_name}")
 
-    overwrites = None
+    # discord.py exige un dict pour `overwrites` (une TypeError si None) —
+    # {} plutôt que d'omettre l'argument : garde le call site uniforme que
+    # private soit True ou False.
+    overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] = {}
     if private:
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+import unicodedata
+
 from .ast_nodes import And, Contains, Node, Not, Or
+
+
+def _normalize(text: str) -> str:
+    """Minuscules + accents retirés, pour que "pokemon" matche "Pokémon" et
+    inversement — les sites marchands orthographient ça de façon incohérente."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
 def evaluate(node: Node, *, text: str) -> bool:
     """Évalue un AST de filtre contre un texte (titre + description, non normalisé)."""
-    haystack = text.lower()
+    haystack = _normalize(text)
 
     if isinstance(node, Contains):
-        return node.text.lower() in haystack
+        return _normalize(node.text) in haystack
     if isinstance(node, Not):
         return not evaluate(node.child, text=text)
     if isinstance(node, And):
