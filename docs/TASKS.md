@@ -180,6 +180,24 @@ synchrone dans les boucles asyncio du scheduler, ce qui bloque brièvement
 l'event loop à chaque cycle — acceptable tant que la config reste un petit
 fichier JSON local. 37 tests toujours verts, ruff clean.
 
+**UX création de filtre du 2026-08-28** : `/filtre add` guidé en 2 étapes (menu
+à cocher pour les sites, formulaire pour les conditions) au lieu de texte libre
+— voir `cordesortie/commands/expression_builder.py`. Moteur de filtres
+désormais insensible aux accents en plus de la casse (`filters/evaluator.py`).
+55 tests.
+
+**Nouveaux sites du 2026-08-28** : adapter **Cultura** ajouté (`REGISTRY`),
+testé en direct — 60 items, prix Cultura isolé du marketplace, vraie
+disponibilité textuelle. Sites investigués et écartés : Intermarché/Système U
+(catalogue par magasin, pas de recherche nationale), Cora (racheté par
+Carrefour, déjà couvert), Géant Casino (redirige vers un format supérette),
+Maxi Toys (fusionné avec King Jouet). **King Jouet** repéré manuellement avec
+des sélecteurs propres mais bloqué par Datadome en Playwright headless (403 +
+CAPTCHA dès la première requête, indétectable via `raise_if_blocked()` car
+l'URL de la page ne change pas — seul un iframe pointe vers
+`captcha-delivery.com`) : pas d'adapter, ajouté à `SITE_NOTES` comme Fnac. Voir
+docs/SITES.md pour le détail par site.
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées

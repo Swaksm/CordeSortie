@@ -1,8 +1,8 @@
 # CordeSortie
 
 Bot Discord de veille sur des items Pokémon en vente sur des sites marchands français
-(Carrefour, JouéClub, Leclerc, Auchan), avec filtres configurables par commande Discord
-et alertes en temps quasi réel dans des salons dédiés.
+(Carrefour, JouéClub, Leclerc, Auchan, Cultura), avec filtres configurables par
+commande Discord et alertes en temps quasi réel dans des salons dédiés.
 
 *CordeSortie* : la corde qui te sort de la galère de surveiller les sites toi-même.
 
@@ -14,16 +14,22 @@ phase.
 
 ## Fonctionnalités
 
-- **Filtres par commande Discord** : expressions `contient("X") ET/OU/NON contient("Y")`
-  avec parenthèses, plus prix min/max et disponibilité. Modifiables après coup
-  (`/filtre edit`) sans supprimer/recréer.
-- **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan fonctionnels. Fnac bloqué par
-  un CAPTCHA Datadome (pas d'adapter, volontairement — voir [docs/SITES.md](docs/SITES.md)).
+- **Création de filtre guidée** (`/filtre add`) : menu à cocher pour les sites, puis un
+  formulaire ("doit contenir tous ces mots" / "au moins un de ces mots" / "ne doit pas
+  contenir") — le bot compose l'expression texte automatiquement, rien à taper à la
+  main. Recherche insensible à la casse et aux accents ("pokemon" = "Pokémon").
+  L'expression texte reste éditable à la main (`ET`/`OU`/`NON`, parenthèses) via
+  `/filtre edit` et testable via `/filtre test` pour les cas avancés. Modifiable après
+  coup (`/filtre edit`) sans supprimer/recréer.
+- **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan, Cultura fonctionnels. Fnac et
+  King Jouet bloqués par un CAPTCHA Datadome (pas d'adapter, volontairement — voir
+  [docs/SITES.md](docs/SITES.md) pour le détail, y compris les sites évalués et écartés).
 - **Un salon Discord dédié par filtre**, auto-créé/supprimé, pour ne jamais mélanger
   les alertes de plusieurs profils. Optionnellement privé (`private:true`, visible
   uniquement par le créateur + les admins).
-- **Salon tableau de bord** et **salon d'aide** auto-générés et toujours à jour.
-- **Salon log** : flux d'évènements en direct + résumé périodique.
+- **Salon tableau de bord**, **salon d'aide** et **salon log** auto-créés et toujours à
+  jour (flux d'évènements en direct + résumé périodique pour ce dernier) — rien à
+  configurer à la main.
 - **`/stats`** : statistiques de scrape sur une période + total d'alertes par profil.
 - **Anti-détection** : intervalle de scrape jitté, plancher dur à 1 minute (non
   contournable), backoff exponentiel sur erreur, détection de CAPTCHA/challenge.
@@ -67,19 +73,21 @@ python -m cordesortie
 ```
 
 Au premier démarrage, le bot crée automatiquement une catégorie **CordeSortie** avec
-un salon info et un salon d'aide (`cordesortie-aide` liste toutes les commandes
-disponibles, toujours à jour).
+un salon tableau de bord, un salon d'aide (`cordesortie-aide` liste toutes les
+commandes disponibles, toujours à jour) et un salon log (flux d'évènements du bot).
 
 ## Premiers pas
 
-1. `/config set-log-channel channel:#un-salon` — pour suivre l'activité du bot.
-2. `/filtre add name:test sites:carrefour,joueclub expression:contient("pokemon")` —
-   crée un premier filtre (large, pour voir le système fonctionner).
-3. `/filtre dry-run name:test` — scrape en direct et montre ce qui matcherait, sans
+1. `/filtre add name:test` — choisis les sites dans le menu, puis remplis juste
+   "Doit contenir TOUS ces mots" avec `pokemon` dans le formulaire qui s'ouvre (large,
+   pour voir le système fonctionner).
+2. `/filtre dry-run name:test` — scrape en direct et montre ce qui matcherait, sans
    créer d'alertes ni toucher à la dédup.
-4. Une fois convaincu, affine avec une expression plus précise et laisse tourner —
+3. Une fois convaincu, affine les conditions avec `/filtre edit` et laisse tourner —
    les alertes arrivent dans le salon dédié au filtre.
-5. `/sites` pour voir le statut de chaque site, `/pause` pour tout arrêter en urgence.
+4. `/sites` pour voir le statut de chaque site, `/pause` pour tout arrêter en urgence.
+5. Le salon log (créé automatiquement) suit l'activité du bot ; `/config
+   set-log-channel` permet de le rediriger vers un autre salon si besoin.
 
 Liste complète des commandes : salon `cordesortie-aide` une fois le bot lancé, ou
 `docs/`.

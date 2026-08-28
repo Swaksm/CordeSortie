@@ -54,6 +54,7 @@ class CordeSortieBot(commands.Bot):
         from .commands.alert_channels import cleanup_orphan_alert_channels
         from .commands.help_channel import update_help_channel
         from .commands.info_channel import update_info_channel
+        from .commands.log_channel import ensure_log_channel
 
         # Copie les commandes globales vers chaque serveur puis sync sur ce
         # serveur précis : les commandes apparaissent immédiatement, au lieu
@@ -74,6 +75,11 @@ class CordeSortieBot(commands.Bot):
                     logger.info("%d salon(s) d'alerte orphelin(s) supprimé(s) sur %s", deleted, guild.name)
             except discord.HTTPException:
                 logger.exception("Échec du nettoyage des salons d'alerte orphelins sur %s", guild.name)
+
+            try:
+                await ensure_log_channel(guild, config, self.config_store, guild.id)
+            except discord.HTTPException:
+                logger.exception("Échec de création du salon log sur %s", guild.name)
 
             try:
                 await update_info_channel(guild, config, self.config_store, guild.id)
