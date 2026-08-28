@@ -2,7 +2,13 @@
 
 Grammaire :
     expr   := atom ((ET atom)* | (OU atom)*)      -- pas de mélange ET/OU sans parenthèses
-    atom   := NON atom | "(" expr ")" | CONTAINS "(" STRING ")"
+    atom   := NON atom | "(" expr ")" | STRING | CONTAINS "(" STRING ")"
+
+Une chaîne entre guillemets toute seule ("pokemon") est un raccourci pour
+contient("pokemon") — les deux syntaxes sont équivalentes et interchangeables,
+contient(...) reste supporté pour ne pas casser les profils existants. Ça permet
+d'écrire des filtres bien plus courts, ex. ("30 ans" OU "30 years") ET "coffret"
+au lieu de (contient("30 ans") OU contient("30 years")) ET contient("coffret").
 
 Mélanger ET et OU au même niveau sans parenthèses est une erreur explicite plutôt
 qu'une priorité devinée — voir docs/RISKS.md §3.
@@ -80,6 +86,10 @@ class _Parser:
             node = self._parse_expr()
             self._expect("RPAREN")
             return node
+
+        if kind == "STRING":
+            self._advance()
+            return Contains(value)
 
         if kind == "CONTAINS":
             self._advance()

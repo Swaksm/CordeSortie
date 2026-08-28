@@ -43,7 +43,10 @@ class FilterCog(commands.Cog):
     @app_commands.describe(
         name="Nom du profil (unique)",
         sites=f"Sites ciblés, séparés par des virgules ({', '.join(SUPPORTED_SITES)})",
-        expression='Expression de filtre, ex. contient("30 ans") ET contient("coffret")',
+        expression=(
+            'Expression de filtre, ex. "pokemon" ET ("30 ans" OU "30 years") '
+            '— parenthèses obligatoires si tu mélanges ET et OU'
+        ),
         price_min="Prix minimum (optionnel)",
         price_max="Prix maximum (optionnel)",
         only_available="N'alerter que si l'item est disponible (par défaut : oui)",
@@ -231,7 +234,10 @@ class FilterCog(commands.Cog):
     @filtre_group.command(name="edit", description="Modifier un profil de filtre existant")
     @app_commands.describe(
         name="Nom du profil à modifier",
-        expression="Nouvelle expression de filtre (optionnel, sinon inchangé)",
+        expression=(
+            'Nouvelle expression de filtre, ex. "pokemon" ET ("30 ans" OU "30 years") '
+            "(optionnel, sinon inchangé)"
+        ),
         sites="Nouveaux sites séparés par des virgules (optionnel, sinon inchangé)",
         price_min="Nouveau prix minimum (optionnel, sinon inchangé)",
         price_max="Nouveau prix maximum (optionnel, sinon inchangé)",
@@ -421,7 +427,7 @@ class FilterCog(commands.Cog):
         name="test", description="Tester une expression de filtre sur un texte fictif"
     )
     @app_commands.describe(
-        expression='Expression à tester, ex. contient("30 ans") ET contient("coffret")',
+        expression='Expression à tester, ex. "pokemon" ET ("30 ans" OU "30 years")',
         texte="Texte fictif d'item (titre + description) à tester contre l'expression",
     )
     async def test(

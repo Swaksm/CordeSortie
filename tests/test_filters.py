@@ -50,6 +50,26 @@ def test_mixing_and_or_without_parens_is_rejected():
         parse_filter('contient("30") OU contient("ans") ET contient("coffret")')
 
 
+def test_bare_string_is_shorthand_for_contains():
+    node = parse_filter('"coffret"')
+    assert matches_item(node, text="Coffret 30 ans", price=50, available=True)
+    assert not matches_item(node, text="Booster 30 ans", price=50, available=True)
+
+
+def test_bare_strings_combined_with_and_or_and_parens():
+    node = parse_filter('("POKEMON" OU "Poke") ET ("30 ans" OU "30 years")')
+    assert matches_item(node, text="Coffret Poke 30 years special", price=10, available=True)
+    assert matches_item(node, text="Pokemon coffret 30 ans", price=10, available=True)
+    assert not matches_item(node, text="Coffret 30 ans", price=10, available=True)
+    assert not matches_item(node, text="Pokemon coffret", price=10, available=True)
+
+
+def test_bare_string_and_contains_syntax_are_interchangeable():
+    node = parse_filter('"pokemon" ET contient("coffret")')
+    assert matches_item(node, text="Pokemon coffret", price=10, available=True)
+    assert not matches_item(node, text="Pokemon booster", price=10, available=True)
+
+
 def test_case_insensitive_keywords():
     node = parse_filter('contient("30") et contient("ans")')
     assert matches_item(node, text="Coffret 30 ans", price=50, available=True)

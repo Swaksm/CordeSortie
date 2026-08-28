@@ -24,6 +24,30 @@ _MESSAGE_LIMIT = 1900
 _HEADER = "**CordeSortie — commandes disponibles**"
 _CONTINUATION_HEADER = "**CordeSortie — commandes (suite)**"
 
+# Bloc statique (pas généré depuis les commandes, contrairement au reste de ce
+# fichier) : les paramètres `expression` des commandes /filtre expliquent la
+# syntaxe en une ligne, mais un exemple posé avec du texte autour est plus
+# facile à suivre pour un premier filtre que de la déduire depuis 3 commandes
+# différentes.
+_FILTER_SYNTAX_GUIDE = """**🔎 Comment écrire une expression de filtre**
+
+Le plus simple : mets juste le texte à chercher entre guillemets.
+> `"pokemon"` → matche tout item dont le titre contient "pokemon"
+
+Combine plusieurs mots avec **ET** / **OU** :
+> `"pokemon" ET "coffret"` → doit contenir les deux
+> `"30 ans" OU "30 years"` → au moins un des deux
+
+Regroupe avec des **parenthèses** dès que tu mélanges ET et OU (obligatoire,
+sinon le bot refuse l'expression pour éviter toute ambiguïté) :
+> `("pokemon" OU "poke") ET ("30 ans" OU "30 years")`
+> → ("pokemon" ou "poke") **et** ("30 ans" ou "30 years")
+
+Exclus un mot avec **NON** :
+> `"pokemon" ET NON "peluche"`
+
+Astuce : teste ton expression sans créer de profil avec `/filtre test`."""
+
 
 def _generate_command_blocks(bot: commands.Bot) -> list[str]:
     leaf_commands = sorted(
@@ -87,7 +111,7 @@ async def update_help_channel(
     bot: commands.Bot,
 ) -> None:
     channel = await _ensure_channel(guild, config)
-    chunks = _chunk_docs(_generate_command_blocks(bot))
+    chunks = _chunk_docs([_FILTER_SYNTAX_GUIDE, *_generate_command_blocks(bot)])
     existing_ids = list(config.help_message_ids)
     new_ids: list[int] = []
 
