@@ -9,9 +9,14 @@ voient toujours tout via la permission Administrator, indépendamment des overwr
 
 from __future__ import annotations
 
+import logging
 import re
 
 import discord
+
+from ..config import GuildConfig
+
+logger = logging.getLogger("cordesortie")
 
 CATEGORY_NAME = "CordeSortie"
 ALERT_CATEGORY_NAME = "Alertes"
@@ -69,3 +74,31 @@ async def delete_alert_channel(guild: discord.Guild, channel_id: int) -> bool:
         return False
     await channel.delete(reason="Profil de filtre supprimé")
     return True
+
+
+async def cleanup_orphan_alert_channels(guild: discord.Guild, config: GuildConfig) -> int:
+    """Supprime les salons de la catégorie Alertes qui ne correspondent plus à
+    aucun profil de filtre de la config actuelle.
+
+    Sans ça, un salon peut rester en permanence si sa suppression a échoué au
+    moment d'un `/filtre remove` (permission manquante, erreur Discord
+    temporaire) : le profil disparaît de la config mais le salon reste, et rien
+    ne revient jamais nettoyer. Appelé à chaque connexion du bot pour que le
+    serveur Discord reste toujours cohérent avec la config. Retourne le nombre
+    de salons supprimés.
+    """
+    category = discord.utils.get(guild.categories, name=ALERT_CATEGORY_NAME)
+    if category is None:
+        return 0
+
+    valid_ids = {profile.alert_channel_id for profile in config.profiles}
+    deleted = 0
+    for channel in category.channels:
+        if channel.id in valid_ids:
+            continue
+        try:
+            await channel.delete(reason="Salon d'alerte orphelin : aucun profil ne le référence")
+            deleted += 1
+        except discord.HTTPException:
+            logger.warning("Impossible de supprimer le salon orphelin %s", channel.id)
+    return deleted
