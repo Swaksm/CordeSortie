@@ -723,11 +723,12 @@ class FilterCog(commands.Cog):
                 continue
 
             try:
-                page = await self.bot.browser.new_page()
-                try:
-                    items = await adapter.fetch_items(page)
-                finally:
-                    await page.close()
+                async with self.bot.browser.scrape_lock:
+                    page = await self.bot.browser.new_page()
+                    try:
+                        items = await adapter.fetch_items(page)
+                    finally:
+                        await page.close()
             except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
                 logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
                 lines.append(f"- **{site}** : erreur de scrape ({exc})")

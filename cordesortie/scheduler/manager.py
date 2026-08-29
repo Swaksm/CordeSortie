@@ -140,11 +140,12 @@ class SchedulerManager:
             items = []
             error: str | None = None
             try:
-                page = await self.bot.browser.new_page()
-                try:
-                    items = await adapter.fetch_items(page)
-                finally:
-                    await page.close()
+                async with self.bot.browser.scrape_lock:
+                    page = await self.bot.browser.new_page()
+                    try:
+                        items = await adapter.fetch_items(page)
+                    finally:
+                        await page.close()
                 consecutive_errors = 0
             except BlockedError as exc:
                 consecutive_errors += 1

@@ -7,6 +7,8 @@ docs/ARCHITECTURE.md §2.4 et docs/RISKS.md §2.
 
 from __future__ import annotations
 
+import asyncio
+
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
 from .errors import BlockedError
@@ -15,6 +17,26 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+
+# Coupe tout ce que Chromium fait par défaut mais qui ne sert à rien en scraping
+# headless (rendu GPU, sync compte, traduction, télémétrie...) — pensé pour les
+# déploiements à mémoire contrainte (ex. Raspberry Pi bas de gamme, voir
+# README.md). --disable-dev-shm-usage évite aussi des crashs sur les systèmes
+# où /dev/shm est petit (cas fréquent sur Raspberry Pi OS).
+_LAUNCH_ARGS = [
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-default-apps",
+    "--disable-sync",
+    "--disable-translate",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--metrics-recording-only",
+    "--mute-audio",
+    "--no-first-run",
+]
 
 # Domaines connus de prestataires de challenge antibot — si l'URL finale d'une
 # page en fait partie, on n'a pas eu le contenu attendu mais un CAPTCHA.
@@ -36,10 +58,20 @@ class BrowserManager:
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
+        # Sérialise les scrapes (voir scheduler/manager.py et
+        # commands/filter_commands.py::dry_run) : sans ça, les boucles par site
+        # tournent en parallèle et peuvent ouvrir jusqu'à une page Chromium par
+        # site actif en même temps, ce qui multiplie le pic mémoire d'autant sur
+        # une machine à mémoire contrainte. Un seul scrape à la fois coûte un
+        # peu de latence globale (les sites passent l'un après l'autre plutôt
+        # qu'en parallèle) mais plafonne le pic à une seule page ouverte.
+        self.scrape_lock = asyncio.Lock()
 
     async def start(self) -> None:
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=True)
+        self._browser = await self._playwright.chromium.launch(
+            headless=True, args=_LAUNCH_ARGS
+        )
         self._context = await self._browser.new_context(
             user_agent=USER_AGENT, locale="fr-FR"
         )
