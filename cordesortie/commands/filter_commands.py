@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -27,6 +28,11 @@ from .responses import respond
 
 _DRY_RUN_MAX_ITEMS_PER_SITE = 5
 _DISCORD_MESSAGE_LIMIT = 1900
+# Garde-fou pour tout le cycle scrape (page + fetch_items + close), même
+# raison que scheduler/manager.py::_SCRAPE_TIMEOUT_SECONDS : sans ça, un site
+# qui bloque indéfiniment gèlerait scrape_lock pour tous les autres sites, pas
+# juste celui-ci.
+_SCRAPE_TIMEOUT_SECONDS = 60
 
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
@@ -723,13 +729,22 @@ class FilterCog(commands.Cog):
                 lines.append(f"- **{site}** : adapter pas encore disponible")
                 continue
 
+            async def _scrape() -> list:
+                page = await self.bot.browser.new_page()
+                try:
+                    return await adapter.fetch_items(page)
+                finally:
+                    await page.close()
+
             try:
                 async with self.bot.browser.scrape_lock:
-                    page = await self.bot.browser.new_page()
-                    try:
-                        items = await adapter.fetch_items(page)
-                    finally:
-                        await page.close()
+                    items = await asyncio.wait_for(_scrape(), timeout=_SCRAPE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                logger.warning("dry-run : scrape de %s trop long, abandonné", site)
+                lines.append(
+                    f"- **{site}** : scrape trop long (>{_SCRAPE_TIMEOUT_SECONDS}s), abandonné"
+                )
+                continue
             except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
                 logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
                 lines.append(f"- **{site}** : erreur de scrape ({exc})")

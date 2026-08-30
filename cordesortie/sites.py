@@ -15,10 +15,20 @@ SUPPORTED_SITES: tuple[str, ...] = (
     "joueclub",
     "cultura",
     "kingjouet",
+    "philibert",
+    "ludifolie",
+    "micromania",
+    "comptoirdesecoliers",
+    "latavernededream",
+    "outpost",
+    "dracaustore",
 )
 
 # Notes affichées par /sites pour les cas particuliers (voir docs/SITES.md).
 SITE_NOTES: dict[str, str] = {
     "fnac": "bloqué par un CAPTCHA Datadome, pas d'adapter prévu",
     "kingjouet": "bloqué par un CAPTCHA Datadome, pas d'adapter prévu",
+    "outpost": "bloqué par Cloudflare, pas d'adapter prévu",
+    "comptoirdesecoliers": "site instable pendant le scrape (rechargement en plein milieu), adapter désactivé",
+    "philibert": "moteur de recherche instable en automatisation, adapter désactivé",
 }

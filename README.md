@@ -1,7 +1,8 @@
 # CordeSortie
 
 Bot Discord de veille sur des items Pokémon en vente sur des sites marchands français
-(Carrefour, JouéClub, Leclerc, Auchan, Cultura), avec filtres configurables par
+(Carrefour, JouéClub, Leclerc, Auchan, Cultura, Ludifolie, Micromania, La Taverne
+de Dream), avec filtres configurables par
 commande Discord et alertes en temps quasi réel dans des salons dédiés.
 
 *CordeSortie* : la corde qui te sort de la galère de surveiller les sites toi-même.
@@ -22,9 +23,11 @@ phase.
   insensible à la casse et aux accents ("pokemon" = "Pokémon"). Expression en texte
   libre (`ET`/`OU`/`NON`, parenthèses) toujours possible via `/filtre test` pour un cas
   plus avancé.
-- **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan, Cultura fonctionnels. Fnac et
-  King Jouet bloqués par un CAPTCHA Datadome (pas d'adapter, volontairement — voir
-  [docs/SITES.md](docs/SITES.md) pour le détail, y compris les sites évalués et écartés).
+- **Multi-sites** : Carrefour, JouéClub, Leclerc, Auchan, Cultura, Ludifolie, Micromania,
+  La Taverne de Dream, Dracaustore fonctionnels. Fnac, King Jouet et Outpost Brussels bloqués par un
+  antibot (CAPTCHA Datadome / Cloudflare) — voir [docs/SITES.md](docs/SITES.md) pour le
+  détail complet, y compris les sites évalués, écartés ou trop instables pour être
+  activés malgré un adapter écrit.
 - **Un salon Discord dédié par filtre**, auto-créé/supprimé, pour ne jamais mélanger
   les alertes de plusieurs profils. Optionnellement privé (`private:true`, visible
   uniquement par le créateur + les admins). Chaque alerte ghost ping le créateur du

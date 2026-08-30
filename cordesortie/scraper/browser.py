@@ -8,8 +8,17 @@ docs/ARCHITECTURE.md §2.4 et docs/RISKS.md §2.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    ElementHandle,
+    Page,
+    Playwright,
+    async_playwright,
+)
+from playwright.async_api import Error as PlaywrightError
 
 from .errors import BlockedError
 
@@ -51,6 +60,28 @@ _BLOCKED_URL_MARKERS = (
 def raise_if_blocked(page: Page, site: str) -> None:
     if any(marker in page.url for marker in _BLOCKED_URL_MARKERS):
         raise BlockedError(f"{site} : page bloquée par un challenge antibot ({page.url})")
+
+
+async def parse_cards_resilient[T](
+    cards: list[ElementHandle],
+    parse_one: Callable[[ElementHandle], Awaitable[T | None]],
+) -> list[T]:
+    """Parse chaque carte, mais s'arrête et garde ce qui a déjà été extrait si
+    le site recharge la page en plein milieu de l'extraction — le contexte JS
+    des handles restants devient alors invalide (`playwright.async_api.Error:
+    Execution context was destroyed, most likely because of a navigation`).
+    Observé en usage réel (rechargement déclenché par une pub/tracker
+    tiers) : mieux vaut renvoyer un sous-ensemble d'items que de perdre tout
+    le cycle de scrape pour ce site."""
+    items: list[T] = []
+    for card in cards:
+        try:
+            item = await parse_one(card)
+        except PlaywrightError:
+            break
+        if item is not None:
+            items.append(item)
+    return items
 
 
 class BrowserManager:

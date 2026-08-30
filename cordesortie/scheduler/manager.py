@@ -28,6 +28,13 @@ logger = logging.getLogger("cordesortie")
 # Plancher dur, non contournable via la config — voir docs/PRD.md §3.4 et
 # docs/RISKS.md (anti-détection).
 _HARD_FLOOR_SECONDS = 60
+
+# Garde-fou pour tout le cycle scrape (page + fetch_items + close) : sans ça,
+# un site qui bloque indéfiniment (ex. page.close() qui ne répond jamais après
+# une navigation intempestive côté site) gèlerait tout le scheduler pour tous
+# les sites, pas juste celui-ci — scrape_lock (browser.py) ne sérialise qu'un
+# scrape à la fois, donc un blocage se propagerait à tout le monde.
+_SCRAPE_TIMEOUT_SECONDS = 60
 _MAX_BACKOFF_MINUTES = 60
 
 
@@ -139,14 +146,26 @@ class SchedulerManager:
             started_at = _now_iso()
             items = []
             error: str | None = None
+            async def _scrape() -> list:
+                page = await self.bot.browser.new_page()
+                try:
+                    return await adapter.fetch_items(page)
+                finally:
+                    await page.close()
+
             try:
                 async with self.bot.browser.scrape_lock:
-                    page = await self.bot.browser.new_page()
-                    try:
-                        items = await adapter.fetch_items(page)
-                    finally:
-                        await page.close()
+                    items = await asyncio.wait_for(_scrape(), timeout=_SCRAPE_TIMEOUT_SECONDS)
                 consecutive_errors = 0
+            except TimeoutError:
+                consecutive_errors += 1
+                error = f"scrape trop long, abandonné après {_SCRAPE_TIMEOUT_SECONDS}s"
+                logger.warning(
+                    "Scrape %s trop long (guild %s), abandonné après %ds",
+                    site,
+                    guild_id,
+                    _SCRAPE_TIMEOUT_SECONDS,
+                )
             except BlockedError as exc:
                 consecutive_errors += 1
                 error = str(exc)

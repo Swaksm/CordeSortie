@@ -245,6 +245,41 @@ au premier déploiement réel sur un Raspberry Pi 3 (1 Go RAM) —
   les ~38 appels à `interaction.response.send_message()` dans tous les cogs.
   73 tests.
 
+**Nouveaux sites du 2026-08-30** : 3 adapters ajoutés à `REGISTRY` — Ludifolie
+(PrestaShop, microdonnées schema.org, vraie dispo), Micromania (Salesforce
+Commerce Cloud, microdonnées schema.org, vraie dispo), La Taverne de Dream
+(Shopify, catégorie Pokémon dédiée). Investigués et écartés : Amazon FR
+(anti-bot trop agressif, prix marketplace), Fnac/King Jouet (déjà bloqués),
+Intermarché/Système U/Cora/Géant Casino/Maxi Toys/La Grande Récré (voir
+sessions précédentes/domaine disparu), Outpost Brussels (Cloudflare). Deux
+adapters écrits mais **volontairement non enregistrés**, trop instables en
+usage réel bien que fonctionnels ponctuellement : Comptoir des Écoliers
+(le site recharge la page en plein milieu du scrape, 2/2 essais, fait planter
+`page.close()`) et Philibert (widget de recherche Doofinder qui se re-render
+de façon imprévisible pendant la frappe automatisée, 3/3 tentatives ratées
+différemment). Voir docs/SITES.md pour le détail complet par site.
+
+Robustesse générale ajoutée suite à ces deux échecs :
+- `_SCRAPE_TIMEOUT_SECONDS` (scheduler + `/filtre dry-run`) : le cycle complet
+  page→fetch_items→close est maintenant borné dans le temps (60s). Sans ça,
+  un site qui bloque indéfiniment (ex. `page.close()` qui ne répond jamais)
+  gèlerait `scrape_lock` pour **tous** les sites, pas juste le fautif — testé
+  en conditions réelles (Comptoir des Écoliers) : timeout propre confirmé au
+  lieu d'un blocage infini.
+- `parse_cards_resilient()` (`scraper/browser.py`) : si le site recharge la
+  page en plein milieu de l'extraction (contexte JS détruit), retourne les
+  items déjà extraits plutôt que de perdre tout le cycle. Utilisé par les
+  5 adapters ajoutés cette session (pas encore rétrofité sur les adapters plus
+  anciens, jamais observés dans ce cas).
+
+**Dracaustore ajouté (même session)** : boutique Shopify (thème plus ancien),
+recherche `/search?type=product&q=pokemon`, cartes `.grid-item.search-result`.
+Pas de marqueur de rupture trouvé → `available=True` toujours (comme
+Carrefour/Leclerc). Testé en direct : 20 items.
+
+Comptage final : 9 sites actifs dans `REGISTRY` (Carrefour, JouéClub, Leclerc,
+Auchan, Cultura, Ludifolie, Micromania, La Taverne de Dream, Dracaustore).
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées
