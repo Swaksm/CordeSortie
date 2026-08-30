@@ -14,6 +14,7 @@ from ..config import DEFAULT_SCRAPE_INTERVAL_MINUTES, FilterProfile
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..notifier import log_event
 from ..scraper import REGISTRY
+from ..scraper.errors import short_error
 from ..sites import SUPPORTED_SITES
 from .alert_channels import create_alert_channel, delete_alert_channel
 from .expression_builder import (
@@ -747,7 +748,7 @@ class FilterCog(commands.Cog):
                 continue
             except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
                 logger.warning("dry-run : échec du scrape de %s : %s", site, exc)
-                lines.append(f"- **{site}** : erreur de scrape ({exc})")
+                lines.append(f"- **{site}** : erreur de scrape (`{short_error(exc)}`)")
                 continue
 
             matches = [

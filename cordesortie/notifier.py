@@ -10,6 +10,7 @@ l'envoi Discord.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import discord
@@ -102,36 +103,60 @@ async def log_event(bot: CordeSortieBot, guild: discord.Guild, message: str) -> 
         logger.warning("Échec d'envoi de l'évènement log dans %s", channel.id)
 
 
-def format_log_summary(runs: list) -> str:
+def _format_since(since: str) -> str:
+    # Discord horodate déjà chaque message (donc la fin de la période est
+    # implicite), mais le résumé agrège plusieurs cycles en un seul message :
+    # sans le début de la période, impossible de savoir sur combien de temps
+    # ça porte juste en le relisant plus tard.
+    try:
+        dt = datetime.fromisoformat(since)
+    except ValueError:
+        return since
+    return dt.strftime("%d/%m %H:%M UTC")
+
+
+def format_log_summary(runs: list, *, since: str) -> str:
+    header = f"**CordeSortie — log** (depuis {_format_since(since)})"
+
     if not runs:
-        return "**CordeSortie — log**\n\nAucun scrape depuis le dernier résumé."
+        return f"{header}\n\nAucun scrape depuis le dernier résumé."
 
     per_site: dict[str, dict[str, int]] = {}
-    errors: list[str] = []
+    # Regroupe les erreurs identiques au lieu de répéter la même ligne jusqu'à
+    # 10 fois (ex. un site en panne pendant 2h peut générer des dizaines de
+    # runs en erreur avec le même message) — beaucoup plus lisible.
+    error_counts: dict[tuple[str, str], int] = {}
     for row in runs:
         site = row["site"]
-        stats = per_site.setdefault(site, {"runs": 0, "items": 0, "matched": 0})
+        stats = per_site.setdefault(site, {"runs": 0, "items": 0, "matched": 0, "errors": 0})
         stats["runs"] += 1
         stats["items"] += row["items_found"]
         stats["matched"] += row["matched"]
         if row["error"]:
-            errors.append(f"{site} : {row['error']}")
+            stats["errors"] += 1
+            key = (site, row["error"])
+            error_counts[key] = error_counts.get(key, 0) + 1
 
-    lines = ["**CordeSortie — log**\n"]
+    lines = [f"{header}\n"]
     for site, stats in per_site.items():
+        error_suffix = f" — ⚠️ {stats['errors']} erreur(s)" if stats["errors"] else ""
         lines.append(
-            f"- {site} : {stats['runs']} scrape(s), {stats['items']} item(s) vu(s), "
-            f"{stats['matched']} match(s)"
+            f"- **{site}** : {stats['runs']} scrape(s), {stats['items']} item(s) vu(s), "
+            f"{stats['matched']} match(s){error_suffix}"
         )
-    if errors:
-        lines.append("\n**Erreurs**")
-        lines.extend(f"- {err}" for err in errors[:10])
+
+    if error_counts:
+        lines.append("\n**Détail des erreurs**")
+        top_errors = sorted(error_counts.items(), key=lambda kv: -kv[1])[:10]
+        for (site, err), count in top_errors:
+            occurrence = f" (x{count})" if count > 1 else ""
+            lines.append(f"- **{site}** : `{err}`{occurrence}")
 
     return "\n".join(lines)
 
 
-async def send_log_summary(channel: discord.TextChannel, runs: list) -> None:
+async def send_log_summary(channel: discord.TextChannel, runs: list, *, since: str) -> None:
     try:
-        await channel.send(format_log_summary(runs))
+        await channel.send(format_log_summary(runs, since=since))
     except discord.HTTPException:
         logger.warning("Échec d'envoi du résumé log dans %s", channel.id)

@@ -18,7 +18,7 @@ from ..config.store import ConfigError
 from ..filters import FilterSyntaxError, matches_item, parse_filter
 from ..notifier import get_log_channel, log_event, send_alert, send_log_summary
 from ..scraper import REGISTRY
-from ..scraper.errors import BlockedError
+from ..scraper.errors import BlockedError, short_error
 
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
@@ -168,11 +168,15 @@ class SchedulerManager:
                 )
             except BlockedError as exc:
                 consecutive_errors += 1
-                error = str(exc)
+                error = short_error(exc)
                 logger.warning("Scrape %s bloqué (guild %s) : %s", site, guild_id, exc)
             except Exception as exc:  # noqa: BLE001 - isole l'échec d'un site
                 consecutive_errors += 1
-                error = str(exc)
+                # str(exc) peut inclure un bloc "Call log:" de plusieurs
+                # lignes (retries internes Playwright) — illisible dans le
+                # salon log Discord. La ligne complète reste dans les logs
+                # Python (journalctl) via le %s ci-dessous.
+                error = short_error(exc)
                 logger.warning("Échec du scrape %s (guild %s) : %s", site, guild_id, exc)
 
             matched_total = 0
@@ -229,7 +233,7 @@ class SchedulerManager:
             )
 
             if error is not None:
-                await log_event(self.bot, guild, f"⚠️ **{site}** : erreur — {error}")
+                await log_event(self.bot, guild, f"⚠️ **{site}** : erreur — `{error}`")
             elif not items:
                 # Distinct du cas "0 match" ci-dessous : 0 item veut dire que le
                 # site n'a rien renvoyé du tout (site down, adapter cassé par un
@@ -275,6 +279,7 @@ class SchedulerManager:
             if channel is None:
                 continue
 
+            period_start = last_check
             runs = await self.bot.db.runs_since(last_check)
             last_check = _now_iso()
-            await send_log_summary(channel, runs)
+            await send_log_summary(channel, runs, since=period_start)
