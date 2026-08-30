@@ -6,6 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .responses import respond
+
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
 
@@ -20,7 +22,7 @@ class ControlCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def pause(self, interaction: discord.Interaction) -> None:
         self.bot.paused = True
-        await interaction.response.send_message(
+        await respond(interaction,
             "⏸️ Scraping mis en pause. Utilise `/resume` pour reprendre.", ephemeral=True
         )
 
@@ -28,4 +30,4 @@ class ControlCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def resume(self, interaction: discord.Interaction) -> None:
         self.bot.paused = False
-        await interaction.response.send_message("▶️ Scraping repris.", ephemeral=True)
+        await respond(interaction, "▶️ Scraping repris.", ephemeral=True)

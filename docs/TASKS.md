@@ -220,6 +220,31 @@ le créateur, 5 fois de suite (notification mobile/desktop sans polluer le
 salon avec des mentions qui restent) — s'arrête au premier échec (rate limit).
 69 tests.
 
+**Optimisations mémoire pour déploiements contraints (2026-08-29)** : suite
+au premier déploiement réel sur un Raspberry Pi 3 (1 Go RAM) —
+- `BrowserManager.scrape_lock` (`scraper/browser.py`) sérialise tous les
+  scrapes (scheduler + `/filtre dry-run`) : plus qu'une page Chromium ouverte
+  à la fois, peu importe le nombre de sites actifs, au lieu de jusqu'à N en
+  parallèle. Vérifié en direct : 5 scrapes lancés simultanément s'exécutent
+  bien en série (~20s = somme des 5 temps individuels), sans deadlock.
+- Arguments Chromium supplémentaires au lancement (GPU, sync, extensions,
+  télémétrie désactivés) — effet non concluant mesuré sur Windows (Chromium y
+  recrée un process GPU en fallback logiciel malgré `--disable-gpu`), gardés
+  car standards et sans risque, potentiellement plus efficaces sur Linux.
+- Les 5 adapters remplacent leur délai fixe `wait_for_timeout(2000)` par
+  `wait_for_selector(CARD_SELECTOR, timeout=15000)` : sur le Pi 3, le délai
+  fixe de 2s s'est révélé trop court pour laisser le temps au JS de peupler
+  les résultats (observé en prod : "Cultura : 0 item trouvé" en boucle alors
+  qu'aucun blocage/CAPTCHA n'était loggé) — attendre l'apparition réelle du
+  sélecteur est plus robuste, sur tout matériel.
+- `cordesortie/commands/responses.py` (`respond()`) : Discord peut redélivrer
+  la même interaction deux fois (observé en prod, corrélé à un rate limit —
+  `discord.errors.HTTPException: ... Interaction has already been
+  acknowledged`, code 40060) ; `respond()` bascule sur `interaction.
+  followup.send()` via `response.is_done()` plutôt que de planter. Remplace
+  les ~38 appels à `interaction.response.send_message()` dans tous les cogs.
+  73 tests.
+
 ## Backlog / v2 (hors MVP)
 
 - [ ] Multi-serveur Discord avec configs isolées

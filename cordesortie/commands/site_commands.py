@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from ..scraper import REGISTRY
 from ..sites import SITE_NOTES, SUPPORTED_SITES
+from .responses import respond
 
 
 class SiteCog(commands.Cog):
@@ -20,4 +21,4 @@ class SiteCog(commands.Cog):
             suffix = f" — {note}" if note else ""
             lines.append(f"- **{site}** : {status}{suffix}")
 
-        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+        await respond(interaction, "\n".join(lines), ephemeral=True)

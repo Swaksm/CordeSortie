@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 
 from playwright.async_api import ElementHandle, Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from ..browser import raise_if_blocked
 from ..models import Item
@@ -34,7 +35,16 @@ class CulturaAdapter:
 
     async def fetch_items(self, page: Page) -> list[Item]:
         await page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(2000)
+        # Les résultats sont peuplés en JS après le chargement initial : on
+        # attend qu'au moins une carte apparaisse plutôt qu'un délai fixe, qui
+        # peut être trop court sur un CPU lent (ex. Raspberry Pi bas de gamme)
+        # et faire remonter "0 item trouvé" à tort. Si rien n'apparaît dans le
+        # temps imparti, `cards` sera juste vide (0 vrai résultat ou page
+        # anormalement lente ce cycle-ci) — pas une erreur en soi.
+        try:
+            await page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        except PlaywrightTimeoutError:
+            pass
         raise_if_blocked(page, self.name)
 
         cards = await page.query_selector_all(CARD_SELECTOR)

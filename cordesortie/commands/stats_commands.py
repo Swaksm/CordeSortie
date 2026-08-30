@@ -7,6 +7,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .responses import respond
+
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
 
@@ -49,7 +51,7 @@ class StatsCog(commands.Cog):
     )
     async def stats(self, interaction: discord.Interaction, heures: int = 24) -> None:
         if interaction.guild_id is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -76,4 +78,4 @@ class StatsCog(commands.Cog):
         if len(message) > _MESSAGE_LIMIT:
             message = message[:_MESSAGE_LIMIT] + "\n… (tronqué)"
 
-        await interaction.response.send_message(message, ephemeral=True)
+        await respond(interaction, message, ephemeral=True)

@@ -7,6 +7,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .responses import respond
+
 if TYPE_CHECKING:
     from ..bot import CordeSortieBot
 
@@ -31,7 +33,7 @@ class ConfigCog(commands.Cog):
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ) -> None:
         if interaction.guild_id is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -47,7 +49,7 @@ class ConfigCog(commands.Cog):
         except Exception:  # noqa: BLE001 - ne doit jamais laisser l'interaction en suspens
             logger.exception("Échec de refresh_guild pour %s", interaction.guild_id)
 
-        await interaction.response.send_message(
+        await respond(interaction,
             f"Salon log défini sur {channel.mention}.", ephemeral=True
         )
 
@@ -55,7 +57,7 @@ class ConfigCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def show(self, interaction: discord.Interaction) -> None:
         if interaction.guild_id is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -73,4 +75,4 @@ class ConfigCog(commands.Cog):
         lines.append(f"- profils de filtre actifs : {len(config.profiles)}")
         lines.append(f"- scraping en pause : {'oui' if self.bot.paused else 'non'}")
 
-        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+        await respond(interaction, "\n".join(lines), ephemeral=True)

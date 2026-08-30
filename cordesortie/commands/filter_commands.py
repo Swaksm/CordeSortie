@@ -23,6 +23,7 @@ from .expression_builder import (
 )
 from .formatting import format_profile_details, format_profile_line
 from .info_channel import update_info_channel
+from .responses import respond
 
 _DRY_RUN_MAX_ITEMS_PER_SITE = 5
 _DISCORD_MESSAGE_LIMIT = 1900
@@ -93,7 +94,7 @@ class _SiteSelectView(discord.ui.View):
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         if not self.selected_sites:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Choisis au moins un site dans le menu avant de continuer.", ephemeral=True
             )
             return
@@ -165,7 +166,7 @@ class _FilterConditionsModal(discord.ui.Modal, title="Conditions du filtre"):
                 exclude=self.exclude.value,
             )
         except ExpressionBuilderError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+            await respond(interaction, str(exc), ephemeral=True)
             return
 
         await self._on_submit(interaction, expression)
@@ -208,14 +209,14 @@ class FilterCog(commands.Cog):
         interval = interval_minutes if interval_minutes is not None else DEFAULT_SCRAPE_INTERVAL_MINUTES
 
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
 
         config = self.bot.config_store.load(interaction.guild_id)
         if any(p.name.lower() == name.lower() for p in config.profiles):
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Un profil nommé **{name}** existe déjà. Supprime-le d'abord avec "
                 f"`/filtre remove name:{name}` si tu veux le remplacer.",
                 ephemeral=True,
@@ -246,7 +247,7 @@ class FilterCog(commands.Cog):
             await select_interaction.response.send_modal(_FilterConditionsModal(on_submit))
 
         view = _SiteSelectView(on_sites_confirmed)
-        await interaction.response.send_message(
+        await respond(interaction,
             "**Étape 1/2** — Choisis les sites à surveiller pour ce profil :",
             view=view,
             ephemeral=True,
@@ -267,7 +268,7 @@ class FilterCog(commands.Cog):
         private: bool,
     ) -> None:
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -277,7 +278,7 @@ class FilterCog(commands.Cog):
             config = store.load(interaction.guild_id)
 
             if any(p.name.lower() == name.lower() for p in config.profiles):
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Un profil nommé **{name}** existe déjà. Supprime-le d'abord avec "
                     f"`/filtre remove name:{name}` si tu veux le remplacer.",
                     ephemeral=True,
@@ -299,7 +300,7 @@ class FilterCog(commands.Cog):
                     private=private,
                 )
             except ValidationError as exc:
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Profil invalide :\n{_format_validation_error(exc)}", ephemeral=True
                 )
                 return
@@ -381,7 +382,7 @@ class FilterCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def remove(self, interaction: discord.Interaction, name: str) -> None:
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -392,7 +393,7 @@ class FilterCog(commands.Cog):
             profile = config.get_profile(name)
 
             if profile is None:
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Aucun profil nommé **{name}**.", ephemeral=True
                 )
                 return
@@ -422,7 +423,7 @@ class FilterCog(commands.Cog):
 
             await log_event(self.bot, interaction.guild, f"🗑️ Filtre **{name}** supprimé")
 
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Profil **{name}** supprimé.{note}", ephemeral=True
             )
 
@@ -448,7 +449,7 @@ class FilterCog(commands.Cog):
         interval_minutes: int | None = None,
     ) -> None:
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -456,7 +457,7 @@ class FilterCog(commands.Cog):
         config = self.bot.config_store.load(interaction.guild_id)
         profile = config.get_profile(name)
         if profile is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Aucun profil nommé **{name}**.", ephemeral=True
             )
             return
@@ -487,7 +488,7 @@ class FilterCog(commands.Cog):
             )
 
         view = _SiteSelectView(on_sites_confirmed, preselected=profile.sites)
-        await interaction.response.send_message(
+        await respond(interaction,
             f"**Étape 1/2** — Sites surveillés par **{name}** :", view=view, ephemeral=True
         )
         view.message = await interaction.original_response()
@@ -505,7 +506,7 @@ class FilterCog(commands.Cog):
         interval_minutes: int | None,
     ) -> None:
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -516,7 +517,7 @@ class FilterCog(commands.Cog):
             profile = config.get_profile(name)
 
             if profile is None:
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Aucun profil nommé **{name}**.", ephemeral=True
                 )
                 return
@@ -540,7 +541,7 @@ class FilterCog(commands.Cog):
             try:
                 new_profile = FilterProfile(**updated_fields)
             except ValidationError as exc:
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Modification invalide :\n{_format_validation_error(exc)}", ephemeral=True
                 )
                 return
@@ -564,7 +565,7 @@ class FilterCog(commands.Cog):
                 f"✏️ Filtre **{name}** modifié par {interaction.user.mention}",
             )
 
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Profil **{name}** mis à jour.\n{format_profile_line(new_profile)}",
                 ephemeral=True,
             )
@@ -573,7 +574,7 @@ class FilterCog(commands.Cog):
         self, interaction: discord.Interaction, name: str, *, paused: bool
     ) -> None:
         if interaction.guild_id is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -584,14 +585,14 @@ class FilterCog(commands.Cog):
             profile = config.get_profile(name)
 
             if profile is None:
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Aucun profil nommé **{name}**.", ephemeral=True
                 )
                 return
 
             if profile.paused == paused:
                 already = "déjà en pause" if paused else "déjà actif"
-                await interaction.response.send_message(
+                await respond(interaction,
                     f"Profil **{name}** {already}.", ephemeral=True
                 )
                 return
@@ -614,7 +615,7 @@ class FilterCog(commands.Cog):
             verb, emoji = ("mis en pause", "⏸️") if paused else ("repris", "▶️")
             await log_event(self.bot, interaction.guild, f"{emoji} Filtre **{name}** {verb}")
 
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Profil **{name}** {verb}.", ephemeral=True
             )
 
@@ -636,7 +637,7 @@ class FilterCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def list_profiles(self, interaction: discord.Interaction) -> None:
         if interaction.guild_id is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -645,7 +646,7 @@ class FilterCog(commands.Cog):
         config = store.load(interaction.guild_id)
 
         if not config.profiles:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Aucun profil de filtre défini pour l'instant.", ephemeral=True
             )
             return
@@ -657,7 +658,7 @@ class FilterCog(commands.Cog):
         if len(message) > _DISCORD_MESSAGE_LIMIT:
             message = message[:_DISCORD_MESSAGE_LIMIT] + "\n… (liste tronquée)"
 
-        await interaction.response.send_message(message, ephemeral=True)
+        await respond(interaction, message, ephemeral=True)
 
     @filtre_group.command(
         name="test", description="Tester une expression de filtre sur un texte fictif"
@@ -672,7 +673,7 @@ class FilterCog(commands.Cog):
         try:
             node = parse_filter(expression)
         except FilterSyntaxError as exc:
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Expression invalide : {exc}", ephemeral=True
             )
             return
@@ -684,7 +685,7 @@ class FilterCog(commands.Cog):
         )
 
         verdict = "✅ Match" if result else "❌ Pas de match"
-        await interaction.response.send_message(verdict, ephemeral=True)
+        await respond(interaction, verdict, ephemeral=True)
 
     @filtre_group.command(
         name="dry-run",
@@ -693,7 +694,7 @@ class FilterCog(commands.Cog):
     @app_commands.describe(name="Nom du profil à tester")
     async def dry_run(self, interaction: discord.Interaction, name: str) -> None:
         if interaction.guild_id is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 "Cette commande doit être utilisée dans un serveur.", ephemeral=True
             )
             return
@@ -703,7 +704,7 @@ class FilterCog(commands.Cog):
         profile = config.get_profile(name)
 
         if profile is None:
-            await interaction.response.send_message(
+            await respond(interaction,
                 f"Aucun profil nommé **{name}**.", ephemeral=True
             )
             return
